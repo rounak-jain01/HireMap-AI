@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    /* Pure OLED-style Dark Mode as default */
+    @apply bg-[#0A0A0A] text-slate-300 selection:bg-indigo-500/30 antialiased;
+  }
+}
+
+/* Single Dot Pattern for Dark Mode */
+.bg-dot-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@layer base {
+  /* Scrollbar ki width aur height (horizontal scroll ke liye) */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  /* Scrollbar ka background (Track) */
+  ::-webkit-scrollbar-track {
+    background: #0A0A0A; 
+    border-radius: 10px;
+  }
+
+  /* Scrollbar ka draggable part (Thumb) */
+  ::-webkit-scrollbar-thumb {
+    background: #27272A; /* Slate/Gray color normal state mein */
+    border-radius: 10px;
+    border: 2px solid #0A0A0A; /* Yeh ek fake padding/margin effect deta hai */
+  }
+
+  /* Hover karne par Thumb ka color (Indigo accent) */
+  ::-webkit-scrollbar-thumb:hover {
+    background: #4F46E5; /* Tailwind's indigo-600 */
+  }
+  
+  /* 🦊 Firefox support ke liye */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #27272A #0A0A0A;
+  }
+}
