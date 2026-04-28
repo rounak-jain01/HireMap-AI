@@ -1,0 +1,43 @@
+name: HireMap Daily Scraper
+
+# Kab chalana hai?
+on:
+  schedule:
+    # Yeh roz raat 2:00 AM (IST) ke aas-paas chalega (20:30 UTC)
+    - cron: '30 20 * * *'
+  
+  # Yeh button deta hai taaki tum manually click karke bhi test kar sako
+  workflow_dispatch: 
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Tumhara code GitHub server par download karega
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 2. Python install karega
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # 3. Saari libraries install karega
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Asli Jadoo (Scraper Run Karega)
+      - name: Run Scraper Script
+        env:
+          # Yahan GitHub Secrets automatically Python tak pahunch jayenge
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python backend/naukri_scrapper.py 
+          # Dhyan rakhna ki tumhare python file ka path sahi ho yahan. 
+          # Agar file root mein hai toh sirf `python naukri_scrapper.py` likhna.

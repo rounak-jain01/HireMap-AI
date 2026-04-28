@@ -191,14 +191,14 @@ export default function Roadmap() {
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading || isLoading}
-            className="flex items-center justify-center gap-2 px-6 h-[52px] rounded-2xl font-bold bg-[#121214] border border-white/10 hover:border-indigo-500/50 text-slate-300 hover:text-white transition-all disabled:opacity-50 whitespace-nowrap shrink-0 w-full sm:w-auto"
+            className="flex items-center justify-center gap-2 px-6 h-13 rounded-2xl font-bold bg-[#121214] border border-white/10 hover:border-indigo-500/50 text-slate-300 hover:text-white transition-all disabled:opacity-50 whitespace-nowrap shrink-0 w-full sm:w-auto"
           >
             {isUploading ? <FiLoader className="animate-spin text-indigo-400 text-lg" /> : <FiUploadCloud className="text-indigo-400 text-lg" />}
             {isUploading ? 'Updating...' : 'Upload Resume'}
           </button>
 
           {/* Analyze Input & Button */}
-          <div className="flex items-center w-full sm:w-auto bg-[#121214] border border-white/10 p-1 rounded-2xl shadow-lg focus-within:border-indigo-500/50 transition-all h-[52px]">
+          <div className="flex items-center w-full sm:w-auto bg-[#121214] border border-white/10 p-1 rounded-2xl shadow-lg focus-within:border-indigo-500/50 transition-all h-13">
             <input 
               type="text" 
               placeholder="Target Role (e.g. SDE)" 
@@ -258,7 +258,7 @@ export default function Roadmap() {
           >
             {/* TOP ROW: SCORE & TIER */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gradient-to-br from-[#121214] to-indigo-900/10 border border-indigo-500/20 p-8 rounded-3xl flex flex-col items-center justify-center text-center relative overflow-hidden">
+              <div className="bg-linear-to-br from-[#121214] to-indigo-900/10 border border-indigo-500/20 p-8 rounded-3xl flex flex-col items-center justify-center text-center relative overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 blur-3xl rounded-full"></div>
                 <h3 className="text-slate-400 font-bold mb-4 uppercase tracking-wider text-sm">Match Confidence</h3>
                 <div className="text-6xl font-black text-white flex items-baseline gap-1">
@@ -417,7 +417,7 @@ export default function Roadmap() {
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   {analysis.recommended_projects?.map((proj, i) => (
-                    <div key={i} className="p-5 bg-gradient-to-br from-[#0A0A0A] to-emerald-900/5 border border-white/5 hover:border-emerald-500/30 transition-colors rounded-2xl">
+                    <div key={i} className="p-5 bg-linear-to-br from-[#0A0A0A] to-emerald-900/5 border border-white/5 hover:border-emerald-500/30 transition-colors rounded-2xl">
                       <h4 className="font-bold text-emerald-300 mb-2">{proj.title}</h4>
                       <p className="text-sm text-slate-400">{proj.description}</p>
                     </div>
@@ -425,21 +425,36 @@ export default function Roadmap() {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-b from-[#121214] to-purple-900/10 border border-white/5 p-6 md:p-8 rounded-3xl">
+              {/* Pivot / Alternative Roles */}
+              <div className="bg-linear-to-b from-[#121214] to-purple-900/10 border border-white/5 p-6 md:p-8 rounded-3xl">
                 <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                   <FiBriefcase className="text-purple-400"/> Best Pivot Roles
                 </h3>
                 <p className="text-sm text-slate-400 mb-4">Based on your current resume, you could easily pivot to:</p>
                 <div className="flex flex-col gap-3">
-                  {analysis.alternative_roles?.map((role, i) => (
+                  {analysis.alternative_roles?.map((roleItem, i) => {
+                    // 🚀 THE FIX: Handle both string and object formats safely
+                    let roleName = "";
+                    
+                    if (typeof roleItem === 'string') {
+                        roleName = roleItem;
+                    } else if (typeof roleItem === 'object' && roleItem !== null) {
+                        // Agar AI ne object bheja (e.g. {role: "Data Scientist", description: "..."})
+                        roleName = roleItem.role || roleItem.title || roleItem.name || "Alternative Role";
+                    }
+
+                    if (!roleName) return null; // Safety check
+
+                    return (
                     <button 
                       key={i}
-                      onClick={() => setTargetRole(role)}
-                      className="text-left w-full p-3 bg-[#0A0A0A] border border-purple-500/20 text-purple-300 rounded-xl hover:bg-purple-500/10 transition-colors text-sm font-bold flex justify-between items-center"
+                      onClick={() => setTargetRole(roleName)}
+                      className="text-left w-full p-3 bg-[#0A0A0A] border border-purple-500/20 text-purple-300 rounded-xl hover:bg-purple-500/10 transition-colors text-sm font-bold flex justify-between items-center group"
                     >
-                      {role} <FiTarget />
+                      <span>{roleName}</span> 
+                      <FiTarget className="text-purple-500/50 group-hover:text-purple-400 transition-colors" />
                     </button>
-                  ))}
+                  )})}
                 </div>
               </div>
             </div>
