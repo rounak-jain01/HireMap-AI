@@ -106,6 +106,18 @@ class AskMapRequest(BaseModel):
     user_question: str
     chat_history: Optional[List[dict]] = [] # 👈 Yeh add karna
 
+class MockInterviewRequest(BaseModel):
+    email: str
+    job_title: str
+    job_description: str
+    user_answer: Optional[str] = ""
+    chat_history: List[dict] = []  # AI aur User ki pichli baatein
+
+class EvaluateInterviewRequest(BaseModel):
+    email: str
+    job_title: str
+    chat_history: List[dict]  # Pura transcript evaluate karne ke liye
+
 
 # ==========================================
 # 🧑‍💻 SECTION 4: USER & PROFILE ROUTES
@@ -149,6 +161,100 @@ async def register_seeker(email: str = Form(default="unknown"), file: UploadFile
     except Exception as e:
         print("❌ CRITICAL ERROR IN PARSER:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+# ==========================================
+# 🎤 1. THE INTERVIEWER AGENT (Asking Questions)
+# ==========================================
+# ==========================================
+# 🎤 1. THE INTERVIEWER AGENT (Asking Questions)
+# ==========================================
+@app.post("/start-mock-interview")
+async def start_mock_interview(req: MockInterviewRequest):
+    try:
+        # 🚀 FIXED: Removed the undefined 'users_collection' DB call
+        
+        system_prompt = f"""You are a warm, professional, and highly realistic Technical Recruiter interviewing a candidate for the '{req.job_title}' role.
+Here is the Job Description summary: {req.job_description}
+
+RULES FOR YOU:
+1. THE INTRO: If the user hasn't said anything yet (start of the interview), YOU MUST start by warmly introducing yourself as the Hiring Manager, giving a short 1-2 sentence exciting intro about the company and the role, and then asking the candidate to introduce themselves.
+2. Ask ONLY ONE question at a time.
+3. BE HUMAN: Acknowledge their answers naturally (e.g., "That makes sense," "I love that approach," "Interesting") before asking the next question.
+4. Keep your responses conversational and brief. NO formatting, NO bullet points. Talk exactly like a human having a Zoom interview."""
+
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Pichli baatein add karo (Context)
+        for msg in req.chat_history:
+            messages.append(msg)
+            
+        # Naya user answer add karo (Agar hai toh)
+        if req.user_answer:
+            messages.append({"role": "user", "content": req.user_answer})
+
+        # Calling Groq API
+        chat_completion = client.chat.completions.create(
+            messages=messages,
+            model="llama-3.1-8b-instant", 
+            temperature=0.6,
+            max_tokens=200
+        )
+
+        ai_reply = chat_completion.choices[0].message.content
+
+        return {"status": "success", "reply": ai_reply}
+
+    except Exception as e:
+        print("Interviewer Error:", e)
+        return {"status": "error", "message": str(e)}
+
+
+# ==========================================
+# ⚖️ 2. THE EVALUATOR AGENT (Generating Report Card)
+# ==========================================
+@app.post("/evaluate-interview")
+async def evaluate_interview(req: EvaluateInterviewRequest):
+    try:
+        # Extracting just the text from the chat history
+        transcript = ""
+        for msg in req.chat_history:
+            role = "Interviewer" if msg["role"] == "assistant" else "Candidate"
+            transcript += f"{role}: {msg['content']}\n\n"
+
+        system_prompt = f"""You are a Senior Hiring Manager evaluating a candidate for the '{req.job_title}' role. 
+Review the following interview transcript and provide a brutal, honest, and constructive evaluation.
+
+You MUST return the output ONLY as a valid JSON object with the following structure:
+{{
+    "score": <number between 0 and 100>,
+    "strengths": ["point 1", "point 2"],
+    "weaknesses": ["point 1", "point 2"],
+    "feedback": "<A short paragraph of overall advice>",
+    "decision": "<Hire, Strong Hire, or Reject>"
+}}
+
+TRANSCRIPT:
+{transcript}
+"""
+
+        # Call Groq API with JSON mode
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "system", "content": system_prompt}],
+            model="llama-3.1-8b-instant",
+            temperature=0.2, # Low temp for factual JSON
+            response_format={"type": "json_object"}
+        )
+
+        evaluation_json_str = chat_completion.choices[0].message.content
+        evaluation_data = json.loads(evaluation_json_str)
+
+        return {"status": "success", "evaluation": evaluation_data}
+
+    except Exception as e:
+        print("Evaluation Error:", e)
+        return {"status": "error", "message": str(e)}
 
 @app.post("/complete-onboarding")
 def complete_onboarding(payload: OnboardingPayload):

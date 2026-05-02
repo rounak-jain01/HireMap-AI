@@ -33,6 +33,7 @@ export default function MainLayout() {
     { id: 'roadmap', path: '/roadmap', icon: <FiTarget />, label: 'AI Resume Analyzer' },
     { id: 'trends', path: '/trends', icon: <FiTrendingUp />, label: 'Market Trends' }, 
     { id: 'skillroadmap', path: '/skillroadmap', icon: <FiMap />, label: 'Learning Hub' }, 
+    { id: 'interciew', path: '/interview', icon: <FiBriefcase />, label: 'Interview Hub' },
     { id: 'chat', path: '/chat', icon: <FiMessageSquare />, label: 'AI Counselor' },
   ];
 

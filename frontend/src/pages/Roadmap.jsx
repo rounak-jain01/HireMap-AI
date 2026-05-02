@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom'; // 🚀 1. Portal Import
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import useAppStore from '../store/useAppStore';
@@ -81,8 +82,7 @@ export default function Roadmap() {
     if (typeof t === 'string') return t;
     const possibleNames = t.task_name || t.name || t.title || t.task || t.description || t.step || t.action;
     if (possibleNames) return possibleNames;
-    const fallbackString = Object.values(t).find(val => typeof val === 'string');
-    return fallbackString || "Unnamed Task";
+    return "Unnamed Task";
   };
 
   if (loading) {
@@ -95,7 +95,7 @@ export default function Roadmap() {
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto w-full relative">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto w-full relative bg-transparent">
       
       {/* HEADER */}
       <div className="mb-10">
@@ -109,9 +109,7 @@ export default function Roadmap() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {roadmaps.map((rm) => (
           <motion.div 
-            key={rm.id} 
-            whileHover={{ y: -5 }}
-            onClick={() => setSelectedRoadmap(rm)}
+            key={rm.id} whileHover={{ y: -5 }} onClick={() => setSelectedRoadmap(rm)}
             className="bg-[#121214] border border-white/5 rounded-3xl p-6 shadow-lg cursor-pointer hover:border-indigo-500/30 transition-all group flex flex-col h-full"
           >
             <div className="flex items-center gap-4 mb-6">
@@ -130,10 +128,7 @@ export default function Roadmap() {
                 <span className="text-lg font-black text-white">{rm.progress}%</span>
               </div>
               <div className="h-3 bg-[#0A0A0A] border border-white/10 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }} animate={{ width: `${rm.progress}%` }}
-                  className={`h-full ${rm.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                />
+                <motion.div initial={{ width: 0 }} animate={{ width: `${rm.progress}%` }} className={`h-full ${rm.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
               </div>
             </div>
           </motion.div>
@@ -149,207 +144,94 @@ export default function Roadmap() {
         </div>
       )}
 
-      {/* 🚀 THE SMART MODAL */}
-      <AnimatePresence>
-        {selectedRoadmap && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedRoadmap(null)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 100, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 100, scale: 0.95 }} 
-              className="fixed top-[5%] left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-4xl h-[90vh] md:h-auto md:max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-t-3xl md:rounded-3xl z-50 overflow-hidden flex flex-col shadow-2xl"
-            >
-              <div className="p-8 bg-[#121214] border-b border-white/5 shrink-0 relative">
-                <button onClick={() => setSelectedRoadmap(null)} className="absolute top-6 right-6 bg-white/5 hover:bg-white/10 text-white p-2 rounded-full transition-all"><FiX size={24}/></button>
-                
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pr-12">
-                  <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-lg">
-                      {selectedRoadmap.skill_name.charAt(0).toUpperCase()}
+      {/* 🚀 2. ROADMAP MODAL PORTAL (Fixed Z-Index) */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {selectedRoadmap && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+                onClick={() => setSelectedRoadmap(null)} 
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999]" 
+              />
+              
+              <motion.div 
+                initial={{ opacity: 0, y: 100, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 100, scale: 0.95 }} 
+                className="fixed top-[5%] left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-4xl h-[90vh] md:h-auto md:max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-t-3xl md:rounded-3xl z-[1000] overflow-hidden flex flex-col shadow-2xl"
+              >
+                <div className="p-8 bg-[#121214] border-b border-white/5 shrink-0 relative">
+                  <button onClick={() => setSelectedRoadmap(null)} className="absolute top-6 right-6 bg-white/5 hover:bg-white/10 text-white p-2 rounded-full transition-all"><FiX size={24}/></button>
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pr-12">
+                    <div className="flex items-center gap-5">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-lg">{selectedRoadmap.skill_name.charAt(0).toUpperCase()}</div>
+                      <div>
+                        <h2 className="text-2xl md:text-3xl font-black text-white">{selectedRoadmap.skill_name}</h2>
+                        <p className="text-indigo-400 font-bold flex items-center gap-2"><FiAward /> AI Personalized Curriculum</p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-2xl md:text-3xl font-black text-white">{selectedRoadmap.skill_name}</h2>
-                      <p className="text-indigo-400 font-bold flex items-center gap-2"><FiAward /> AI Personalized Curriculum</p>
-                    </div>
-                  </div>
-                  
-                  <div className="w-full md:w-64">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-bold text-slate-400">Overall Progress</span>
-                      <span className="text-xl font-black text-white">{selectedRoadmap.progress}%</span>
-                    </div>
-                    <div className="h-3 bg-black rounded-full overflow-hidden border border-white/10">
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${selectedRoadmap.progress}%` }} className={`h-full ${selectedRoadmap.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
+                    <div className="w-full md:w-64">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-bold text-slate-400">Progress</span>
+                        <span className="text-xl font-black text-white">{selectedRoadmap.progress}%</span>
+                      </div>
+                      <div className="h-3 bg-black rounded-full overflow-hidden border border-white/10">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${selectedRoadmap.progress}%` }} className={`h-full ${selectedRoadmap.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar relative">
-                <div className="absolute top-10 bottom-10 left-11.25 md:left-15.25 w-0.5 bg-indigo-500/10"></div>
-
-                {Array.isArray(selectedRoadmap.roadmap_data) && selectedRoadmap.roadmap_data.length > 0 ? (
+                <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar relative">
+                  <div className="absolute top-10 bottom-10 left-11.25 md:left-15.25 w-0.5 bg-indigo-500/10"></div>
                   <div className="space-y-12 relative">
                     {selectedRoadmap.roadmap_data.map((step, sIdx) => {
-                      
-                      const stepTitle = step.title || step.step_name || step.name || `Phase ${sIdx + 1}`;
-                      
-                      // 🚀 THE FIX: Identify Capstone Project (Phase 6)
+                      const stepTitle = step.title || step.step_name || `Phase ${sIdx + 1}`;
                       const isCapstone = sIdx === selectedRoadmap.roadmap_data.length - 1;
-
-                      // 🚀 EXTRACTION MAGIC: Get clean project name even if AI messes up
-                      let projectName = stepTitle.replace(/🏆/g, '').replace(/Final Capstone Project:?/i, '').replace(/Capstone:?/i, '').replace(/Phase 6:?/i, '').trim();
-                      if (projectName.length < 3 || projectName.toLowerCase() === 'phase 6') {
-                          projectName = `${selectedRoadmap.skill_name} Mastery Project`;
-                      }
-
                       const allTasks = step.tasks || [];
-                      
-                      // Separate learning tasks from mini projects
-                      const normalTasks = allTasks.filter(t => !getTaskName(t).includes('🛠️'));
-                      const projectTasks = allTasks.filter(t => getTaskName(t).includes('🛠️'));
 
                       return (
                         <div key={sIdx} className="relative z-10 pl-16 md:pl-20">
-                          
                           <div className={`absolute left-0 top-0 w-12 h-12 rounded-full border-4 flex items-center justify-center text-lg font-black shadow-lg transition-colors ${
-                            step.tasks?.length > 0 && step.tasks?.every(t => t.completed || (typeof t === 'object' && t.completed)) 
+                            step.tasks?.every(t => t.completed || (typeof t === 'object' && t.completed)) 
                               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
                               : isCapstone ? 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400' : 'bg-[#0A0A0A] border-indigo-500 text-indigo-400'
                           }`}>
                             {isCapstone ? <FiAward /> : sIdx + 1}
                           </div>
                           
-                          {/* 🚀 REGULAR PHASES (1 to 5) */}
-                          {!isCapstone ? (
-                            <>
-                              <h4 className="text-xl md:text-2xl font-bold text-white mb-6 pt-2">{stepTitle}</h4>
-                              <div className="flex flex-col gap-3 mb-6">
-                                {normalTasks.map((task, tempIdx) => {
-                                  const taskName = getTaskName(task);
-                                  const tIdx = allTasks.findIndex(t => getTaskName(t) === taskName);
-                                  const isCompleted = typeof task === 'string' ? false : task.completed;
-                                  
-                                  return (
-                                    <button 
-                                      key={tempIdx} 
-                                      onClick={() => toggleTask(selectedRoadmap.id, sIdx, tIdx)}
-                                      className={`flex items-center gap-4 p-4 md:p-5 rounded-2xl border transition-all text-left group w-full ${
-                                        isCompleted 
-                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                                        : 'bg-[#121214] border-white/5 text-slate-300 hover:border-indigo-500/30 hover:bg-indigo-500/5'
-                                      }`}
-                                    >
-                                      <div className={`shrink-0 transition-transform ${isCompleted ? 'scale-110' : 'group-hover:scale-110 group-hover:text-indigo-400'}`}>
-                                        {isCompleted ? <FiCheckCircle size={22} /> : <FiCircle size={22} />}
-                                      </div>
-                                      <span className={`text-sm md:text-base font-medium ${isCompleted ? 'line-through opacity-80' : ''}`}>
-                                        {taskName}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              {/* 🚀 THE MINI PROJECT RENDERER */}
-                              {projectTasks.length > 0 && (
-                                <div className="flex flex-col gap-3">
-                                  {projectTasks.map((task, tempIdx) => {
-                                    const taskName = getTaskName(task);
-                                    const tIdx = allTasks.findIndex(t => getTaskName(t) === taskName);
-                                    const isCompleted = typeof task === 'string' ? false : task.completed;
-                                    
-                                    // Extract clean name like "Todo App" from "🛠️ Mini Project: Todo App"
-                                    const cleanName = taskName.replace(/🛠️/g, '').replace(/Mini Project:?/i, '').replace(/Project:?/i, '').trim();
-
-                                    return (
-                                      <div key={tempIdx} className={`relative p-1 rounded-2xl bg-gradient-to-r ${isCompleted ? 'from-emerald-500/20 to-teal-500/20' : 'from-indigo-500/30 to-purple-500/30'}`}>
-                                        <button 
-                                          onClick={() => toggleTask(selectedRoadmap.id, sIdx, tIdx)}
-                                          className={`w-full flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 rounded-xl border-none transition-all text-left ${
-                                            isCompleted ? 'bg-[#0A0A0A]/90 text-emerald-400' : 'bg-[#0A0A0A] text-indigo-300 hover:bg-[#121214]'
-                                          }`}
-                                        >
-                                          <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isCompleted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
-                                              {isCompleted ? <FiCheckCircle size={20} /> : <span className="font-black text-xl">{'</>'}</span>}
-                                            </div>
-                                            <div>
-                                              <span className="text-xs font-black uppercase tracking-wider opacity-70 block mb-1">
-                                                Mini Project
-                                              </span>
-                                              <span className={`text-base md:text-lg font-bold ${isCompleted ? 'line-through opacity-80' : ''}`}>
-                                                Build: {cleanName}
-                                              </span>
-                                            </div>
-                                          </div>
-                                          
-                                          <span className={`text-xs font-bold px-4 py-2 rounded-lg shrink-0 border ${isCompleted ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400'}`}>
-                                            {isCompleted ? 'Completed' : 'Build This'}
-                                          </span>
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            /* 🚀 CAPSTONE PROJECT UI (Phase 6) */
-                            <div className="bg-gradient-to-br from-fuchsia-900/20 to-purple-900/10 border border-fuchsia-500/30 rounded-3xl p-6 md:p-8 mt-2 shadow-[0_0_30px_rgba(217,70,239,0.1)]">
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className="bg-fuchsia-500/20 text-fuchsia-400 px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase">Major Project</span>
-                              </div>
-                              <h4 className="text-2xl md:text-3xl font-black text-white mb-6">Build: {projectName}</h4>
-                              
-                              <p className="text-slate-400 mb-4 text-sm uppercase tracking-wider font-bold flex items-center gap-2">
-                                <FiTerminal /> Steps to Complete the Project
-                              </p>
-                              
-                              <div className="flex flex-col gap-3">
-                                {allTasks.map((task, tIdx) => {
-                                  const taskName = getTaskName(task);
-                                  const isCompleted = typeof task === 'string' ? false : task.completed;
-                                  
-                                  return (
-                                    <button 
-                                      key={tIdx} 
-                                      onClick={() => toggleTask(selectedRoadmap.id, sIdx, tIdx)}
-                                      className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-all text-left w-full ${
-                                        isCompleted 
-                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                                        : 'bg-[#0A0A0A] border-white/5 text-slate-300 hover:border-fuchsia-500/30 hover:text-white'
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-4">
-                                        <div className={`shrink-0 ${isCompleted ? 'text-emerald-400' : 'text-fuchsia-500'}`}>
-                                          {isCompleted ? <FiCheckCircle size={20} /> : <FiCode size={20} />}
-                                        </div>
-                                        <span className={`text-sm md:text-base font-medium ${isCompleted ? 'line-through opacity-80' : ''}`}>
-                                          {taskName.replace('🛠️', '').trim()}
-                                        </span>
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                          <div className={isCapstone ? "bg-gradient-to-br from-fuchsia-900/20 to-purple-900/10 border border-fuchsia-500/30 rounded-3xl p-6 shadow-xl" : ""}>
+                            <h4 className={`font-bold text-white mb-6 ${isCapstone ? 'text-2xl md:text-3xl' : 'text-xl md:text-2xl'}`}>{stepTitle}</h4>
+                            <div className="space-y-3">
+                              {allTasks.map((task, tIdx) => {
+                                const taskName = getTaskName(task);
+                                const isCompleted = typeof task === 'string' ? false : task.completed;
+                                return (
+                                  <button 
+                                    key={tIdx} onClick={() => toggleTask(selectedRoadmap.id, sIdx, tIdx)}
+                                    className={`flex items-center gap-4 p-4 rounded-xl border transition-all text-left w-full ${
+                                      isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-[#121214] border-white/5 text-slate-300 hover:border-indigo-500/30'
+                                    }`}
+                                  >
+                                    <div className={isCompleted ? 'text-emerald-400' : 'text-slate-500 group-hover:text-indigo-400'}>
+                                      {isCompleted ? <FiCheckCircle size={20} /> : <FiCircle size={20} />}
+                                    </div>
+                                    <span className={`text-sm md:text-base font-medium ${isCompleted ? 'line-through opacity-80' : ''}`}>{taskName}</span>
+                                  </button>
+                                );
+                              })}
                             </div>
-                          )}
-
+                          </div>
                         </div>
                       );
                     })}
                   </div>
-                ) : (
-                  <p className="text-red-400 text-center py-10 bg-red-500/10 rounded-xl border border-red-500/20">
-                    AI generated an unrecognized format. Delete this skill and re-add it.
-                  </p>
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

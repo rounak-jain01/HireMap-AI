@@ -103,6 +103,35 @@ const useAppStore = create((set) => ({
   activeChatId: null, // Hum component mein isko handle kar lenge
   setActiveChatId: (id) => set({ activeChatId: id }),
 
+
+  // ==========================
+  // 🎤 MOCK INTERVIEW HUB STATE (WITH PERSISTENCE)
+  // ==========================
+  savedInterviews: JSON.parse(localStorage.getItem('hiremap_saved_interviews')) || [], 
+  
+  addInterviewPrep: (job) => set((state) => {
+    const exists = state.savedInterviews.find(j => j.id === job.id);
+    if (exists) return state;
+    const updated = [...state.savedInterviews, job];
+    localStorage.setItem('hiremap_saved_interviews', JSON.stringify(updated)); // Save to cache
+    return { savedInterviews: updated };
+  }),
+  
+  removeInterviewPrep: (jobId) => set((state) => {
+    const updated = state.savedInterviews.filter(j => j.id !== jobId);
+    localStorage.setItem('hiremap_saved_interviews', JSON.stringify(updated)); // Update cache
+    return { savedInterviews: updated };
+  }),
+
+  // 🚀 NAYA FUNCTION: Report Card save karne ke liye
+  saveInterviewReport: (jobId, report) => set((state) => {
+    const updated = state.savedInterviews.map(job =>
+      job.id === jobId ? { ...job, reportCard: report } : job
+    );
+    localStorage.setItem('hiremap_saved_interviews', JSON.stringify(updated)); // Save report to cache
+    return { savedInterviews: updated };
+  }),
+
 }));
 
 

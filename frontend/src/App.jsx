@@ -16,6 +16,7 @@ import Trends from './pages/Trends';    // Market Predictor
 import Roadmap from './pages/Roadmap';  // Interactive Learning Hub
 import Chat from './pages/Chat';        // AI Counselor
 import Profile from './pages/Profile';  // User Settings
+import InterviewHub from './pages/InterviewHub';
 
 // 🛡️ The Bouncer (Protected Route Logic)
 const ProtectedRoute = ({ children }) => {
@@ -63,6 +64,7 @@ function App() {
             <Route path="/trends" element={<Trends />} />
             <Route path="/skillroadmap" element={<Roadmap />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/interview" element={<InterviewHub />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
 
