@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../context/AuthContext'; // 👈 Auth context import karna zaroori hai
+import { useAuth } from '../context/AuthContext'; 
 import { 
   FiTrendingUp, FiCpu, FiShield, FiCloud, FiHexagon, 
   FiMonitor, FiX, FiExternalLink, FiPlayCircle, FiBookOpen, FiArrowRight, FiDatabase, FiCode,
-  FiPlus, FiLoader, FiCheckCircle // 👈 Naye icons add kiye
+  FiPlus, FiLoader, FiCheckCircle 
 } from 'react-icons/fi';
 
-// 🧠 THE ICON MAPPER
 const iconMap = {
   FiCpu: <FiCpu />,
   FiCloud: <FiCloud />,
@@ -19,16 +18,14 @@ const iconMap = {
 };
 
 export default function Trends() {
-  const { user } = useAuth(); // 👈 User ka data yahan se milega
+  const { user } = useAuth(); 
   const [trends, setTrends] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDomain, setSelectedDomain] = useState(null);
 
-  // 🚀 States for Roadmap Saving
   const [savedSkills, setSavedSkills] = useState([]);
   const [savingSkill, setSavingSkill] = useState(null);
 
-  // Fetch Live AI Predictions
   useEffect(() => {
     const fetchLiveTrends = async () => {
       try {
@@ -48,11 +45,10 @@ export default function Trends() {
     fetchLiveTrends();
   }, []);
 
-  // 🛠️ The Animated Save Function
   const handleSaveToRoadmap = async (skillName) => {
     if (savedSkills.includes(skillName) || savingSkill === skillName) return;
 
-    setSavingSkill(skillName); // Start loading animation
+    setSavingSkill(skillName); 
 
     try {
       const res = await fetch('http://127.0.0.1:8000/add-to-roadmap', {
@@ -63,7 +59,7 @@ export default function Trends() {
       const data = await res.json();
       
       if (data.status === 'success') {
-        setSavedSkills(prev => [...prev, skillName]); // UI update to checkmark
+        setSavedSkills(prev => [...prev, skillName]); 
       } else {
         alert(data.error || "Failed to save skill to roadmap.");
       }
@@ -71,7 +67,7 @@ export default function Trends() {
       console.error("Save error:", err);
       alert("Network error while saving.");
     } finally {
-      setSavingSkill(null); // Stop loading animation
+      setSavingSkill(null); 
     }
   };
 
@@ -84,7 +80,7 @@ export default function Trends() {
           <FiTrendingUp className="absolute inset-0 m-auto text-indigo-400 text-2xl animate-pulse" />
         </div>
         <h2 className="text-xl font-bold text-white mb-2">Analyzing Global Market...</h2>
-        <p className="text-indigo-400 font-medium animate-pulse">Llama 3.1 is predicting future career trends</p>
+        <p className="text-indigo-400 font-medium animate-pulse">HireMap 3.1 is predicting future career trends</p>
       </div>
     );
   }
@@ -226,28 +222,46 @@ export default function Trends() {
                   </div>
                 </div>
 
+                {/* 🚀 FIXED: SMART DYNAMIC COURSES PARSER */}
                 <div>
                   <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <FiBookOpen /> Top Recommended Resources
                   </h3>
                   <div className="space-y-4">
-                    {selectedDomain.courses?.map((course, idx) => (
-                      <a 
-                        key={idx} href={course.link} target="_blank" rel="noreferrer"
-                        className="flex items-center justify-between p-4 bg-[#121214] hover:bg-[#1a1a24] border border-white/5 hover:border-indigo-500/30 rounded-2xl transition-all group"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
-                            {course.type?.toLowerCase().includes('video') ? <FiPlayCircle /> : <FiBookOpen />}
+                    {selectedDomain.courses?.map((courseItem, idx) => {
+                      // 🧠 AI Output fail-safe
+                      const isString = typeof courseItem === 'string';
+                      const courseName = isString ? courseItem : (courseItem.name || courseItem.title || "Recommended Tutorial");
+                      const coursePlatform = isString ? "YouTube / Web" : (courseItem.platform || "Online Resource");
+                      const courseType = isString ? "Video" : (courseItem.type || "Course");
+                      
+                      // Agar AI link dena bhul gaya, toh auto Youtube Search Link generate kardo
+                      const courseLink = (!isString && courseItem.link && courseItem.link !== "#") 
+                          ? courseItem.link 
+                          : `https://www.youtube.com/results?search_query=${encodeURIComponent(courseName + ' full course tutorial')}`;
+
+                      return (
+                        <a 
+                          key={idx} href={courseLink} target="_blank" rel="noreferrer"
+                          className="flex items-center justify-between p-4 bg-[#121214] hover:bg-[#1a1a24] border border-white/5 hover:border-indigo-500/30 rounded-2xl transition-all group"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
+                              {courseType.toLowerCase().includes('video') || coursePlatform.toLowerCase().includes('youtube') ? <FiPlayCircle /> : <FiBookOpen />}
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-white group-hover:text-indigo-300 transition-colors">{courseName}</h4>
+                              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{coursePlatform} • {courseType}</span>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="font-bold text-white group-hover:text-indigo-300 transition-colors">{course.name}</h4>
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{course.platform} • {course.type}</span>
-                          </div>
-                        </div>
-                        <FiExternalLink className="text-slate-600 group-hover:text-indigo-400" />
-                      </a>
-                    ))}
+                          <FiExternalLink className="text-slate-600 group-hover:text-indigo-400" />
+                        </a>
+                      );
+                    })}
+                    
+                    {(!selectedDomain.courses || selectedDomain.courses.length === 0) && (
+                      <p className="text-slate-500 text-sm italic">No specific courses available right now. We recommend searching on YouTube or Coursera.</p>
+                    )}
                   </div>
                 </div>
 

@@ -100,6 +100,12 @@ class UpdateRoadmapRequest(BaseModel):
     updated_data: List[Any]
     new_progress: int
 
+class AskMapRequest(BaseModel):
+    email: str
+    target_domain: str
+    user_question: str
+    chat_history: Optional[List[dict]] = [] # 👈 Yeh add karna
+
 
 # ==========================================
 # 🧑‍💻 SECTION 4: USER & PROFILE ROUTES
@@ -110,15 +116,23 @@ def read_root():
 
 @app.post("/register-seeker")
 async def register_seeker(email: str = Form(default="unknown"), file: UploadFile = File(...)):
-    """Extracts text from PDF and gets skills via Groq AI"""
+    """Extracts text from PDF and generates a Rich Persona + Skills via Groq AI"""
     try:
         content = await file.read()
         resume_text = "".join(page.extract_text() for page in PyPDF2.PdfReader(io.BytesIO(content)).pages)
 
+        prompt = f"""
+        Read the entire resume text carefully. Return ONLY a valid JSON object.
+        1. "skills": Array of all technical/soft skills.
+        2. "rich_persona": A highly detailed 3-4 sentence paragraph defining this candidate. Mention their exact profession (e.g., Frontend Developer, HR Manager), their experience level, key achievements, and the exact type of roles they are suited for. DO NOT miss their core industry.
+        
+        Resume Text: {resume_text[:3000]} 
+        """
+
         chat = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "Extract skills and summary. Return valid JSON with 'skills' (array) and 'summary' (string)."},
-                {"role": "user", "content": f"Resume Text: {resume_text}"}
+                {"role": "system", "content": "You are an elite HR Profiler. Extract data into strictly valid JSON."},
+                {"role": "user", "content": prompt}
             ],
             model="llama-3.1-8b-instant",
             response_format={"type": "json_object"}
@@ -130,9 +144,10 @@ async def register_seeker(email: str = Form(default="unknown"), file: UploadFile
             "status": "Success", 
             "resume_text": resume_text,
             "extracted_skills": data.get('skills', []),
-            "summary": data.get('summary', '')
+            "summary": data.get('rich_persona', '') 
         }
     except Exception as e:
+        print("❌ CRITICAL ERROR IN PARSER:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/complete-onboarding")
@@ -140,10 +155,15 @@ def complete_onboarding(payload: OnboardingPayload):
     """Saves user profile and generates vector embeddings"""
     try:
         skills_text = ", ".join(payload.skills) if payload.skills else "Beginner"
+        
+        # Super Vector logic
+        ai_text_for_vector = f"Target Role: {payload.target_role}. Core Skills: {skills_text}. Profile Summary: {payload.resume_text[:1500]}"
+        embedding = get_embedding(ai_text_for_vector)
+
         user_data = {
             "email": payload.email, "full_name": payload.full_name,
             "resume_text": payload.resume_text, "extracted_skills": payload.skills,
-            "user_embedding": get_embedding(skills_text), "target_role": payload.target_role,
+            "user_embedding": embedding, "target_role": payload.target_role,
             "min_expected_salary": payload.min_salary, "preferred_locations": payload.locations
         }
 
@@ -163,80 +183,269 @@ def get_user_profile(email: str = Query(...)):
         if not res.data: return {"status": "error", "message": "User profile not found"}
         
         user_data = res.data[0]
-        user_data.pop("user_embedding", None) # Hide embedding from frontend
+        user_data.pop("user_embedding", None)
         return {"status": "success", "data": user_data}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @app.post("/update-profile")
 def update_user_profile(profile: UserProfileUpdate):
-    """Update specific user preferences"""
+    """Update specific user preferences AND automatically rebuild AI Vector if Role changes"""
     try:
+        print(f"⚙️ Updating preferences for: {profile.email}")
+        
         update_data = {k: v for k, v in profile.dict().items() if v is not None and k != "email"}
         if not update_data: return {"status": "No data provided"}
+
+        # 🚀 THE CRITICAL FIX: Agar user Target Role change karta hai, toh Vector naya banana padega!
+        if "target_role" in update_data:
+            print("🔄 Target Role changed! Regenerating Super Vector...")
+            # 1. DB se purani skills aur persona uthao
+            user_res = supabase.table("job_seekers").select("extracted_skills, resume_text").eq("email", profile.email).execute()
+            
+            if user_res.data:
+                old_data = user_res.data[0]
+                skills_list = old_data.get("extracted_skills", [])
+                skills_text = ", ".join(skills_list) if skills_list else "General"
+                persona = old_data.get("resume_text", "")
+                
+                # 2. Naye Target Role ke sath Naya Super Text banao
+                new_ai_text = f"Target Role: {update_data['target_role']}. Core Skills: {skills_text}. Profile Summary: {persona[:1500]}"
+                
+                # 3. Naya Vector (Math Array) Generate karo aur update_data mein add kar do
+                update_data["user_embedding"] = get_embedding(new_ai_text)
+                print("✅ New Super Vector generated successfully!")
+
+        # 4. Final Data DB mein save karo
         response = supabase.table("job_seekers").update(update_data).eq("email", profile.email).execute()
+        
         return {"status": "Success", "updated_data": response.data[0] if response.data else None}
+        
     except Exception as e:
+        print("❌ ERROR IN UPDATING PROFILE:", str(e))
         return {"error": str(e)}
 
 
 # ==========================================
 # 💼 SECTION 5: JOB MATCHING ROUTES
 # ==========================================
+
+# 🚀 NAYA ROUTE: Get All Jobs (For Explore Mode)
+# ==========================================
+# 💼 SECTION 5: JOB MATCHING ROUTES
+# ==========================================
+
+@app.get("/get-all-jobs")
+def get_all_jobs(limit: int = 1000): # 🚀 THE FIX: Default limit changed to 1000
+    """Fetches all latest jobs without AI matching"""
+    try:
+        # Ab yeh 1000 jobs tak fetch karega
+        response = supabase.table("jobs").select("*").order("created_at", desc=True).limit(limit).execute()
+        jobs = response.data
+        
+        # Clean up data before sending to frontend
+        for job in jobs:
+            job.pop("job_embedding", None) # Hide vectors
+            job["matchScore"] = None       # Default null for global jobs
+            
+        return {"status": "success", "jobs": jobs}
+    except Exception as e:
+        print("❌ ERROR FETCHING ALL JOBS:", str(e))
+        return {"status": "error", "message": str(e)}
+
+
+def format_jd_with_ai(raw_jd: str) -> str:
+    """Uses Llama 3 to structure messy job descriptions into beautiful Markdown."""
+    try:
+        prompt = f"""
+        You are an expert HR Copywriter. Take the following messy, unstructured job description and format it into clean, professional Markdown.
+        
+        RULES:
+        1. Use headers like ### About the Role, ### Key Responsibilities, ### Requirements, etc.
+        2. Use bullet points (-) for responsibilities and requirements.
+        3. Highlight important keywords using bold (**keyword**).
+        4. DO NOT make up any information. Keep the original meaning 100% intact.
+        5. DO NOT return any intro text like "Here is the formatted JD". ONLY return the markdown.
+        
+        Raw Job Description:
+        {raw_jd}
+        """
+        
+        chat = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.1-8b-instant", # 8B is fast and perfect for text formatting
+            temperature=0.2
+        )
+        return chat.choices[0].message.content.strip()
+    except Exception as e:
+        print("AI Formatting Failed:", e)
+        return raw_jd # Fallback to original if AI fails
+
 @app.post("/add-job")
 def add_new_job(job: JobData):
-    """Admin route to add jobs with vectors"""
+    """Admin route to add jobs with vectors AND auto-formatting"""
     try:
+        # 🚀 STEP 1: Format the JD using AI BEFORE saving
+        clean_jd = format_jd_with_ai(job.job_description)
+        job.job_description = clean_jd # Update the messy JD with clean JD
+        
+        # 🚀 STEP 2: Generate Vector
         ai_vector = get_embedding(f"{job.title} at {job.company} in {job.domain} domain. Located in {job.city}.")
+        
+        # 🚀 STEP 3: Save to Database
         supabase.table("jobs").insert({**job.dict(), "job_embedding": ai_vector}).execute()
-        return {"message": "Job saved with ML Vector!"}
+        
+        return {"message": "Job saved with ML Vector & Perfectly Structured JD!"}
     except Exception as e:
         return {"error": str(e)}
 
+
+
 @app.get("/match-jobs")
 def get_matched_jobs(email: str = Query(...)):
-    """The Ultimate AI Matchmaker logic"""
+    """The Hybrid AI Matchmaker: Smart Vector Search + Balanced LLM Reranking"""
     try:
-        user_res = supabase.table("job_seekers").select("user_embedding").eq("email", email).execute()
-        if not user_res.data: return {"status": "error", "message": "User not found"}
+        print(f"🔍 Fetching & Deep Evaluating Jobs for: {email}")
         
-        user_vector = parse_vector(user_res.data[0].get("user_embedding"))
-        all_jobs = supabase.table("jobs").select("*").execute().data
+        user_res = supabase.table("job_seekers").select("user_embedding, resume_text, target_role").eq("email", email).execute()
+        if not user_res.data: 
+            return {"status": "error", "message": "User not found"}
         
+        user_data = user_res.data[0]
+        user_vector = parse_vector(user_data.get("user_embedding"))
+        all_jobs = supabase.table("jobs").select("*").limit(1000).execute().data
+        
+        # 🟢 STAGE 1: Balanced Vector Filtering (Math)
         for job in all_jobs:
             job_vector = parse_vector(job.get("job_embedding")) 
             if user_vector and job_vector:
                 sim = calculate_similarity(user_vector, job_vector)
-                # Fair Scaling (0.25 to 0.70 threshold)
-                job["matchScore"] = 0 if sim <= 0.25 else 100 if sim >= 0.70 else int(((sim - 0.25) / 0.45) * 100)
+                
+                # 🚀 THE FIX 1: Relaxed Baseline back to 0.28 so adjacent roles (Sales->Marketing) can pass the math test
+                job["matchScore"] = 0 if sim <= 0.28 else 100 if sim >= 0.75 else int(((sim - 0.28) / 0.47) * 100)
             else:
                 job["matchScore"] = 0 
                 
-        random.shuffle(all_jobs) # Fresh UI feel
-        return {"status": "success", "jobs": all_jobs}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+        # Send ONLY jobs with 35%+ match score to the LLM (Lowered to catch more potentials)
+        top_jobs = sorted([j for j in all_jobs if j["matchScore"] >= 35], key=lambda x: x["matchScore"], reverse=True)[:15]
 
+        if not top_jobs:
+            return {"status": "success", "jobs": []}
+
+        # 🟢 STAGE 2: AI Cross-Examination (The Smart Career Coach)
+        print(f"🧠 Llama 70B is intelligently analyzing WHY these {len(top_jobs)} jobs fit the user...")
+        
+        jobs_context = []
+        for i, j in enumerate(top_jobs):
+            jobs_context.append(f"Job ID {i}: {j['job_title']} at {j['company_name']}. Req: {', '.join(j.get('skills_required', []))}")
+        
+       # 🚀 THE FIX: Ultra-strict JSON prompt for Llama 70B
+        prompt = f"""
+        You are an Expert AI Career Matchmaker.
+        Candidate Target Role: {user_data.get('target_role')}
+        Candidate ACTUAL Profile: {str(user_data.get('resume_text'))[:1000]}...
+        
+        Jobs to evaluate:
+        {json.dumps(jobs_context)}
+        
+        YOUR RULES:
+        1. Evaluate if the candidate has the direct skills OR highly transferable skills for the job.
+        2. DO NOT hallucinate. Do not pretend they have hard tech skills they don't possess.
+        3. CRITICAL: Output ONLY a perfectly valid JSON object. DO NOT output any extra text, no markdown formatting, no trailing commas, and ensure all quotes are properly escaped.
+        
+        Format exactly like this:
+        {{
+            "justifications": [
+                {{"job_id": 0, "is_match": true, "reason": "Short reason here."}},
+                {{"job_id": 1, "is_match": false, "reason": "Domain mismatch."}}
+            ]
+        }}
+        """
+
+        chat = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a precise JSON-generating AI. Only output valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            model="llama-3.1-8b-instant", # 70B is smart enough to handle this nuance perfectly
+            response_format={"type": "json_object"}
+        )
+        
+        evaluation = parse_ai_json(chat.choices[0].message.content).get("justifications", [])
+        
+        # 🟢 STAGE 3: Final Assembly
+        final_jobs = []
+        for eval_data in evaluation:
+            if eval_data.get("is_match") is True:
+                idx = eval_data.get("job_id")
+                if idx < len(top_jobs):
+                    matched_job = top_jobs[idx]
+                    matched_job["ai_recommendation_reason"] = eval_data.get("reason")
+                    matched_job.pop("job_embedding", None)
+                    final_jobs.append(matched_job)
+
+        return {"status": "success", "jobs": final_jobs}
+
+    except Exception as e:
+        print("❌ ERROR FETCHING JOBS:", str(e))
+        return {"status": "error", "message": str(e)}
 
 # ==========================================
 # 🤖 SECTION 6: AI FEATURES (Chat, Trends, Analysis)
 # ==========================================
 @app.get("/analyze-career")
 def analyze_career(email: str, target_domain: str):
-    """AI Resume Auditor"""
+    """AI Resume Auditor - STRICT & DETERMINISTIC"""
     try:
-        user_data = supabase.table("job_seekers").select("extracted_skills").eq("email", email).execute()
-        skills_str = ", ".join(user_data.data[0].get('extracted_skills', [])) if user_data.data else "None"
+        user_data = supabase.table("job_seekers").select("extracted_skills, resume_text").eq("email", email).execute()
+        
+        if not user_data.data: 
+            return {"status": "error", "message": "User not found"}
+            
+        skills_list = user_data.data[0].get('extracted_skills', [])
+        skills_str = ", ".join(skills_list) if skills_list else "None"
+        resume_text = user_data.data[0].get('resume_text', 'No background provided.')
 
-        prompt = f"""You are a Career Counselor. Candidate skills: {skills_str}. Target: {target_domain}.
-        Return ONLY valid JSON with keys: match_confidence_score (int), readiness_tier (string), skill_gap_analysis (array of objects), learning_resources (array of objects), recommended_projects (array of objects), alternative_roles (array), estimated_preparation_time (string), expert_advice (string)."""
+        prompt = f"""
+        You are a STRICT, BRUTALLY HONEST, AND CONSISTENT Tech Auditor.
+        Candidate Profile: {str(resume_text)[:1500]}
+        Target Role: {target_domain}
+        
+        RULES:
+        1. DO NOT HALLUCINATE. Base your score ONLY on exact matching skills.
+        2. A completely unrelated transition (e.g. Sales to Data Science) MUST have a score below 20%.
+        
+        Return ONLY valid JSON with EXACTLY these keys:
+        - "match_confidence_score" (int)
+        - "readiness_tier" (string)
+        - "skill_gap_analysis" (array of objects: {{"skill": "Name", "importance": "High/Med/Low"}})
+        - "learning_resources" (array of objects: {{"name": "Course Title", "platform": "Coursera/YouTube"}}) 
+        - "recommended_projects" (array of objects: {{"title": "Project Name", "description": "Details"}})
+        - "alternative_roles" (array of strings)
+        - "estimated_preparation_time" (string)
+        - "expert_advice" (string)
+        """
 
         chat = client.chat.completions.create(
-            messages=[{"role": "system", "content": "Strict JSON API."}, {"role": "user", "content": prompt}],
-            model="llama-3.1-8b-instant", response_format={"type": "json_object"}
+            messages=[
+                {"role": "system", "content": "You are a precise JSON API. Only output valid JSON."}, 
+                {"role": "user", "content": prompt}
+            ],
+            model="llama-3.3-70b-versatile", 
+            response_format={"type": "json_object"},
+            # 🚀 THE TRUST FIX: Zero Temperature means EXACT SAME output every single time!
+            temperature=0.0,
+            seed=42 # Seed ensures deterministic logic
         )
-        return {"status": "Success", "target_role": target_domain, "analysis": parse_ai_json(chat.choices[0].message.content)}
+        
+        return {
+            "status": "Success", 
+            "target_role": target_domain, 
+            "analysis": parse_ai_json(chat.choices[0].message.content)
+        }
+        
     except Exception as e:
+        print("❌ ERROR IN ANALYZER:", str(e))
         return {"error": str(e)}
 
 @app.post("/ask-hiremap-ai")
@@ -288,10 +497,22 @@ def get_market_trends():
 def add_to_roadmap(req: RoadmapSaveRequest):
     """Generates a 6-step project-based roadmap"""
     try:
-        prompt = f"""Generate a 6-step roadmap for: {req.skill_name}.
-        Steps 1-5 MUST have exactly 4 tasks (3 learning, 1 '🛠️ Project:').
-        Step 6 MUST be '🏆 Final Capstone Project' with 3-4 project execution tasks.
-        Return ONLY valid JSON with a single key 'steps'."""
+        # 🚀 THE FIX: Naya Strict Prompt for Actual Projects!
+        prompt = f"""Generate a 6-step learning roadmap for the skill: {req.skill_name}.
+        
+        RULES FOR JSON OUTPUT:
+        - Return ONLY a valid JSON with a single key 'steps' containing an array of 6 step objects.
+        - Each step must have a 'title' (string) and 'tasks' (array of strings).
+        
+        PHASE 1 to 5 (Mini Projects):
+        - The 'title' should be the topic name (e.g., 'Phase 1: Basics of Python').
+        - Exactly 4 tasks per phase. The first 3 tasks must be learning tasks. 
+        - The 4th task MUST be a hands-on project and MUST start exactly with this prefix: "🛠️ Mini Project: [Name of Project]".
+        
+        PHASE 6 (The Capstone):
+        - The 'title' MUST NOT be 'Phase 6'. It MUST be the actual creative name of the final project using this format: "🏆 Capstone: [Creative Project Name]". (e.g., "🏆 Capstone: Bus Reservation System").
+        - The 'tasks' in Phase 6 must be the 3-4 step-by-step instructions to build this capstone project.
+        """
         
         chat = client.chat.completions.create(
             messages=[{"role": "system", "content": "Strict JSON API."}, {"role": "user", "content": prompt}],

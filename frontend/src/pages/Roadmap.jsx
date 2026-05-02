@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import useAppStore from '../store/useAppStore';
 import { 
   FiCheckCircle, FiCircle, FiLoader, FiZap, 
-  FiBookOpen, FiX, FiAward
+  FiBookOpen, FiX, FiAward, FiCode, FiTerminal
 } from 'react-icons/fi';
 
 export default function Roadmap() {
   const { user } = useAuth();
-  const [roadmaps, setRoadmaps] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedRoadmap, setSelectedRoadmap] = useState(null); // Modal State
+  
+  const { userRoadmaps: roadmaps, setUserRoadmaps: setRoadmaps } = useAppStore();
+  const [loading, setLoading] = useState(roadmaps.length === 0);
+  const [selectedRoadmap, setSelectedRoadmap] = useState(null); 
 
   useEffect(() => {
     if (user?.email) {
@@ -33,48 +35,54 @@ export default function Roadmap() {
   };
 
   const toggleTask = async (rmId, sIdx, tIdx) => {
-    // Deep copy roadmaps
-    let updatedRoadmaps = [...roadmaps];
+    let updatedRoadmaps = JSON.parse(JSON.stringify(roadmaps));
     let rmIndex = updatedRoadmaps.findIndex(r => r.id === rmId);
     let rm = updatedRoadmaps[rmIndex];
     let task = rm.roadmap_data[sIdx].tasks[tIdx];
     
-    // Flip completed state
-    task.completed = !task.completed;
+    if (typeof task === 'string') {
+        rm.roadmap_data[sIdx].tasks[tIdx] = { task_name: task, completed: true };
+    } else {
+        task.completed = !task.completed;
+    }
 
-    // Recalculate Progress
     let totalTasks = 0;
     let completedTasks = 0;
     
     rm.roadmap_data.forEach(step => {
       step.tasks?.forEach(t => {
         totalTasks++;
-        if (t.completed) completedTasks++;
+        if (t.completed || (typeof t === 'object' && t.completed)) completedTasks++;
       });
     });
     
     let newProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     rm.progress = newProgress;
 
-    // Update main state and modal state
-    setRoadmaps(updatedRoadmaps);
+    setRoadmaps(updatedRoadmaps); 
+    
     if (selectedRoadmap && selectedRoadmap.id === rmId) {
-      setSelectedRoadmap({...rm});
+      setSelectedRoadmap({...rm}); 
     }
 
-    // Silent DB Sync
     try {
       await fetch(`http://127.0.0.1:8000/update-roadmap-step?roadmap_id=${rm.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          updated_data: rm.roadmap_data, 
-          new_progress: newProgress 
-        })
+        body: JSON.stringify({ updated_data: rm.roadmap_data, new_progress: newProgress })
       });
     } catch (error) {
       console.error("Failed to sync progress with DB:", error);
     }
+  };
+
+  const getTaskName = (t) => {
+    if (!t) return "Unknown Task";
+    if (typeof t === 'string') return t;
+    const possibleNames = t.task_name || t.name || t.title || t.task || t.description || t.step || t.action;
+    if (possibleNames) return possibleNames;
+    const fallbackString = Object.values(t).find(val => typeof val === 'string');
+    return fallbackString || "Unnamed Task";
   };
 
   if (loading) {
@@ -107,7 +115,7 @@ export default function Roadmap() {
             className="bg-[#121214] border border-white/5 rounded-3xl p-6 shadow-lg cursor-pointer hover:border-indigo-500/30 transition-all group flex flex-col h-full"
           >
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black bg-linear-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-400 shadow-[0_0_15px_rgba(79,70,229,0.2)] shrink-0 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-400 shadow-[0_0_15px_rgba(79,70,229,0.2)] shrink-0 group-hover:scale-110 transition-transform">
                 {rm.skill_name.charAt(0).toUpperCase()}
               </div>
               <div>
@@ -151,13 +159,12 @@ export default function Roadmap() {
               initial={{ opacity: 0, y: 100, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 100, scale: 0.95 }} 
               className="fixed top-[5%] left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-4xl h-[90vh] md:h-auto md:max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-t-3xl md:rounded-3xl z-50 overflow-hidden flex flex-col shadow-2xl"
             >
-              {/* Modal Header */}
               <div className="p-8 bg-[#121214] border-b border-white/5 shrink-0 relative">
                 <button onClick={() => setSelectedRoadmap(null)} className="absolute top-6 right-6 bg-white/5 hover:bg-white/10 text-white p-2 rounded-full transition-all"><FiX size={24}/></button>
                 
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pr-12">
                   <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black bg-linear-to-br from-indigo-600 to-purple-600 text-white shadow-lg">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-lg">
                       {selectedRoadmap.skill_name.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -178,97 +185,154 @@ export default function Roadmap() {
                 </div>
               </div>
 
-              {/* Modal Body (Checklist) - VERTICAL TIMELINE UI */}
               <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar relative">
-                {/* Timeline Line (Background) */}
                 <div className="absolute top-10 bottom-10 left-11.25 md:left-15.25 w-0.5 bg-indigo-500/10"></div>
 
                 {Array.isArray(selectedRoadmap.roadmap_data) && selectedRoadmap.roadmap_data.length > 0 ? (
                   <div className="space-y-12 relative">
                     {selectedRoadmap.roadmap_data.map((step, sIdx) => {
-                      // Separate normal tasks from project tasks
-                      const normalTasks = step.tasks?.filter(t => !t.task_name.includes('🛠️')) || [];
-                      const projectTasks = step.tasks?.filter(t => t.task_name.includes('🛠️')) || [];
+                      
+                      const stepTitle = step.title || step.step_name || step.name || `Phase ${sIdx + 1}`;
+                      
+                      // 🚀 THE FIX: Identify Capstone Project (Phase 6)
+                      const isCapstone = sIdx === selectedRoadmap.roadmap_data.length - 1;
+
+                      // 🚀 EXTRACTION MAGIC: Get clean project name even if AI messes up
+                      let projectName = stepTitle.replace(/🏆/g, '').replace(/Final Capstone Project:?/i, '').replace(/Capstone:?/i, '').replace(/Phase 6:?/i, '').trim();
+                      if (projectName.length < 3 || projectName.toLowerCase() === 'phase 6') {
+                          projectName = `${selectedRoadmap.skill_name} Mastery Project`;
+                      }
+
+                      const allTasks = step.tasks || [];
+                      
+                      // Separate learning tasks from mini projects
+                      const normalTasks = allTasks.filter(t => !getTaskName(t).includes('🛠️'));
+                      const projectTasks = allTasks.filter(t => getTaskName(t).includes('🛠️'));
 
                       return (
                         <div key={sIdx} className="relative z-10 pl-16 md:pl-20">
                           
-                          {/* Step Number Circle (On the timeline line) */}
                           <div className={`absolute left-0 top-0 w-12 h-12 rounded-full border-4 flex items-center justify-center text-lg font-black shadow-lg transition-colors ${
-                            step.tasks?.every(t => t.completed) 
+                            step.tasks?.length > 0 && step.tasks?.every(t => t.completed || (typeof t === 'object' && t.completed)) 
                               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
-                              : 'bg-[#0A0A0A] border-indigo-500 text-indigo-400'
+                              : isCapstone ? 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400' : 'bg-[#0A0A0A] border-indigo-500 text-indigo-400'
                           }`}>
-                            {sIdx + 1}
+                            {isCapstone ? <FiAward /> : sIdx + 1}
                           </div>
                           
-                          <h4 className="text-xl md:text-2xl font-bold text-white mb-6 pt-2">{step.title}</h4>
-                          
-                          {/* NORMAL TASKS (Vertical List) */}
-                          <div className="flex flex-col gap-3 mb-6">
-                            {normalTasks.map((task) => {
-                              // Find original index to update DB correctly
-                              const tIdx = step.tasks.findIndex(t => t.task_name === task.task_name);
-                              
-                              return (
-                                <button 
-                                  key={tIdx} 
-                                  onClick={() => toggleTask(selectedRoadmap.id, sIdx, tIdx)}
-                                  className={`flex items-center gap-4 p-4 md:p-5 rounded-2xl border transition-all text-left group w-full ${
-                                    task.completed 
-                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                                    : 'bg-[#121214] border-white/5 text-slate-300 hover:border-indigo-500/30 hover:bg-indigo-500/5'
-                                  }`}
-                                >
-                                  <div className={`shrink-0 transition-transform ${task.completed ? 'scale-110' : 'group-hover:scale-110 group-hover:text-indigo-400'}`}>
-                                    {task.completed ? <FiCheckCircle size={22} /> : <FiCircle size={22} />}
-                                  </div>
-                                  <span className={`text-sm md:text-base font-medium ${task.completed ? 'line-through opacity-80' : ''}`}>
-                                    {task.task_name}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          {/* 🏆 HIGHLIGHTED PROJECTS SECTION */}
-                          {projectTasks.length > 0 && (
-                            <div className="flex flex-col gap-3">
-                              {projectTasks.map((task) => {
-                                // Find original index
-                                const tIdx = step.tasks.findIndex(t => t.task_name === task.task_name);
-                                // Clean up the "🛠️ Project:" prefix for cleaner UI
-                                const cleanName = task.task_name.replace('🛠️ Project:', '').replace('🛠️', '').trim();
-
-                                return (
-                                  <div key={tIdx} className={`relative p-1 rounded-2xl bg-linear-to-r ${task.completed ? 'from-emerald-500/20 to-teal-500/20' : 'from-fuchsia-500/30 to-purple-500/30'}`}>
+                          {/* 🚀 REGULAR PHASES (1 to 5) */}
+                          {!isCapstone ? (
+                            <>
+                              <h4 className="text-xl md:text-2xl font-bold text-white mb-6 pt-2">{stepTitle}</h4>
+                              <div className="flex flex-col gap-3 mb-6">
+                                {normalTasks.map((task, tempIdx) => {
+                                  const taskName = getTaskName(task);
+                                  const tIdx = allTasks.findIndex(t => getTaskName(t) === taskName);
+                                  const isCompleted = typeof task === 'string' ? false : task.completed;
+                                  
+                                  return (
                                     <button 
+                                      key={tempIdx} 
                                       onClick={() => toggleTask(selectedRoadmap.id, sIdx, tIdx)}
-                                      className={`w-full flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 rounded-xl border-none transition-all text-left ${
-                                        task.completed ? 'bg-[#0A0A0A]/90 text-emerald-400' : 'bg-[#0A0A0A] text-fuchsia-300 hover:bg-[#121214]'
+                                      className={`flex items-center gap-4 p-4 md:p-5 rounded-2xl border transition-all text-left group w-full ${
+                                        isCompleted 
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                                        : 'bg-[#121214] border-white/5 text-slate-300 hover:border-indigo-500/30 hover:bg-indigo-500/5'
+                                      }`}
+                                    >
+                                      <div className={`shrink-0 transition-transform ${isCompleted ? 'scale-110' : 'group-hover:scale-110 group-hover:text-indigo-400'}`}>
+                                        {isCompleted ? <FiCheckCircle size={22} /> : <FiCircle size={22} />}
+                                      </div>
+                                      <span className={`text-sm md:text-base font-medium ${isCompleted ? 'line-through opacity-80' : ''}`}>
+                                        {taskName}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* 🚀 THE MINI PROJECT RENDERER */}
+                              {projectTasks.length > 0 && (
+                                <div className="flex flex-col gap-3">
+                                  {projectTasks.map((task, tempIdx) => {
+                                    const taskName = getTaskName(task);
+                                    const tIdx = allTasks.findIndex(t => getTaskName(t) === taskName);
+                                    const isCompleted = typeof task === 'string' ? false : task.completed;
+                                    
+                                    // Extract clean name like "Todo App" from "🛠️ Mini Project: Todo App"
+                                    const cleanName = taskName.replace(/🛠️/g, '').replace(/Mini Project:?/i, '').replace(/Project:?/i, '').trim();
+
+                                    return (
+                                      <div key={tempIdx} className={`relative p-1 rounded-2xl bg-gradient-to-r ${isCompleted ? 'from-emerald-500/20 to-teal-500/20' : 'from-indigo-500/30 to-purple-500/30'}`}>
+                                        <button 
+                                          onClick={() => toggleTask(selectedRoadmap.id, sIdx, tIdx)}
+                                          className={`w-full flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 rounded-xl border-none transition-all text-left ${
+                                            isCompleted ? 'bg-[#0A0A0A]/90 text-emerald-400' : 'bg-[#0A0A0A] text-indigo-300 hover:bg-[#121214]'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isCompleted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+                                              {isCompleted ? <FiCheckCircle size={20} /> : <span className="font-black text-xl">{'</>'}</span>}
+                                            </div>
+                                            <div>
+                                              <span className="text-xs font-black uppercase tracking-wider opacity-70 block mb-1">
+                                                Mini Project
+                                              </span>
+                                              <span className={`text-base md:text-lg font-bold ${isCompleted ? 'line-through opacity-80' : ''}`}>
+                                                Build: {cleanName}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          
+                                          <span className={`text-xs font-bold px-4 py-2 rounded-lg shrink-0 border ${isCompleted ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400'}`}>
+                                            {isCompleted ? 'Completed' : 'Build This'}
+                                          </span>
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            /* 🚀 CAPSTONE PROJECT UI (Phase 6) */
+                            <div className="bg-gradient-to-br from-fuchsia-900/20 to-purple-900/10 border border-fuchsia-500/30 rounded-3xl p-6 md:p-8 mt-2 shadow-[0_0_30px_rgba(217,70,239,0.1)]">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="bg-fuchsia-500/20 text-fuchsia-400 px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase">Major Project</span>
+                              </div>
+                              <h4 className="text-2xl md:text-3xl font-black text-white mb-6">Build: {projectName}</h4>
+                              
+                              <p className="text-slate-400 mb-4 text-sm uppercase tracking-wider font-bold flex items-center gap-2">
+                                <FiTerminal /> Steps to Complete the Project
+                              </p>
+                              
+                              <div className="flex flex-col gap-3">
+                                {allTasks.map((task, tIdx) => {
+                                  const taskName = getTaskName(task);
+                                  const isCompleted = typeof task === 'string' ? false : task.completed;
+                                  
+                                  return (
+                                    <button 
+                                      key={tIdx} 
+                                      onClick={() => toggleTask(selectedRoadmap.id, sIdx, tIdx)}
+                                      className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-all text-left w-full ${
+                                        isCompleted 
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                                        : 'bg-[#0A0A0A] border-white/5 text-slate-300 hover:border-fuchsia-500/30 hover:text-white'
                                       }`}
                                     >
                                       <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${task.completed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-fuchsia-500/20 text-fuchsia-400'}`}>
-                                          {task.completed ? <FiCheckCircle size={20} /> : <span className="font-black text-xl">{'</>'}</span>}
+                                        <div className={`shrink-0 ${isCompleted ? 'text-emerald-400' : 'text-fuchsia-500'}`}>
+                                          {isCompleted ? <FiCheckCircle size={20} /> : <FiCode size={20} />}
                                         </div>
-                                        <div>
-                                          <span className="text-xs font-black uppercase tracking-wider opacity-70 block mb-1">
-                                            {step.title.includes('Capstone') ? 'FINAL CAPSTONE' : 'MINI PROJECT'}
-                                          </span>
-                                          <span className={`text-base md:text-lg font-bold ${task.completed ? 'line-through opacity-80' : ''}`}>
-                                            {cleanName}
-                                          </span>
-                                        </div>
+                                        <span className={`text-sm md:text-base font-medium ${isCompleted ? 'line-through opacity-80' : ''}`}>
+                                          {taskName.replace('🛠️', '').trim()}
+                                        </span>
                                       </div>
-                                      
-                                      <span className={`text-xs font-bold px-4 py-2 rounded-lg shrink-0 border ${task.completed ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-400'}`}>
-                                        {task.completed ? 'Completed' : 'Build This'}
-                                      </span>
                                     </button>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
 
@@ -278,7 +342,7 @@ export default function Roadmap() {
                   </div>
                 ) : (
                   <p className="text-red-400 text-center py-10 bg-red-500/10 rounded-xl border border-red-500/20">
-                    Failed to parse roadmap steps. Delete this skill and re-add it from the AI Analyzer.
+                    AI generated an unrecognized format. Delete this skill and re-add it.
                   </p>
                 )}
               </div>

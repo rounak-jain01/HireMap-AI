@@ -204,11 +204,8 @@ if __name__ == "__main__":
     
     # The "Universal Coverage" Domain List
     target_domains = [
-        "Software Engineer", "Frontend Developer", "Backend Developer", "Data Scientist", "Cybersecurity",
-        "UI UX Designer", "Graphic Designer", "Video Editor",
-        "Digital Marketing", "SEO Specialist", "Content Writer", "Social Media Manager",
-        "Business Analyst", "Sales Manager", "Human Resources", "Product Manager",
-        "Mechanical Engineer", "Civil Engineer", "Finance Analyst", "Accountant"
+        "Machine Learning", "Data Analyst" , "AI Engineer", "Data Engineer", "Data Scientist", "Cybersecurity",
+        "UI UX Designer", "Data Analyst", "Business Analyst",
     ]
 
     print(f"🚀 Starting Mega Matrix Scraper for ALL INDIA ({len(target_domains)} domains)...")

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiHome, FiBriefcase, FiTarget, FiMessageSquare, 
-  FiLogOut, FiSearch, FiBell, FiTrendingUp, FiMap 
+  FiLogOut, FiTrendingUp, FiMap, FiMenu, FiX, FiChevronRight
 } from 'react-icons/fi';
 
 export default function MainLayout() {
@@ -11,6 +12,7 @@ export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // 🚀 Fetch Basic User Info for Navbar
   useEffect(() => {
@@ -24,7 +26,7 @@ export default function MainLayout() {
     }
   }, [user]);
 
-  // 🚀 Sidebar Links (Removed Profile)
+  // 🚀 Sidebar Links
   const navItems = [
     { id: 'dashboard', path: '/dashboard', icon: <FiHome />, label: 'Dashboard' },
     { id: 'jobs', path: '/jobs', icon: <FiBriefcase />, label: 'Job Matches' },
@@ -34,7 +36,19 @@ export default function MainLayout() {
     { id: 'chat', path: '/chat', icon: <FiMessageSquare />, label: 'AI Counselor' },
   ];
 
-  // Helper to get initials (e.g., "Rounak Jain" -> "RJ")
+  // Smart Page Title Generator for Header
+  const getPageTitle = () => {
+    const path = location.pathname;
+    if (path.includes('dashboard')) return 'Command Center';
+    if (path.includes('jobs')) return 'Job Matches';
+    if (path.includes('roadmap')) return 'AI Resume Analyzer';
+    if (path.includes('trends')) return 'Market Trends';
+    if (path.includes('skillroadmap')) return 'Learning Hub';
+    if (path.includes('chat')) return 'AI Counselor';
+    if (path.includes('profile')) return 'Profile Settings';
+    return 'Workspace';
+  };
+
   const getInitials = (name) => {
     if (!name) return user?.email?.charAt(0).toUpperCase() || 'U';
     const parts = name.split(' ');
@@ -44,107 +58,149 @@ export default function MainLayout() {
 
   const handleSignOut = async () => {
     try {
-      await signOut(); // Firebase/Supabase se logout karega
-      navigate('/');   // 👈 Logout hote hi seedha Landing page par fekega!
+      await signOut(); 
+      navigate('/');   
     } catch (error) {
       console.error("Logout Error:", error);
     }
   };
 
-  return (
-    <div className="flex h-screen bg-[#0A0A0A] font-sans text-white overflow-hidden">
-      
-      {/* 🌍 GLOBAL LEFT SIDEBAR */}
-      <aside className="w-64 bg-[#121214] border-r border-white/5 flex flex-col justify-between hidden md:flex shrink-0">
-        <div>
-          <div className="h-20 flex items-center px-8 border-b border-white/5">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)]">H</div>
-              <span className="text-xl font-black tracking-tight">HireMap</span>
+  // 🧩 Reusable Sidebar Component
+  const SidebarContent = () => (
+    <>
+      <div>
+        <div className="h-20 flex items-center px-6 border-b border-white/5">
+          <Link to="/dashboard" className="flex items-center gap-3 group" onClick={() => setIsMobileMenuOpen(false)}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-black text-white text-lg shadow-[0_0_20px_rgba(79,70,229,0.4)] group-hover:scale-105 transition-transform">
+              H
             </div>
-          </div>
-
-          <nav className="p-4 space-y-2 mt-4">
-            {navItems.map((item) => {
-              const isActive = location.pathname.includes(item.path);
-              return (
-                <Link
-                  key={item.id}
-                  to={item.path}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                    isActive 
-                      ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-[inset_0_0_20px_rgba(79,70,229,0.05)]' 
-                      : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <span className="text-lg">{item.icon}</span> {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+            <span className="text-xl font-black tracking-tight text-white group-hover:text-indigo-400 transition-colors">HireMap</span>
+          </Link>
         </div>
 
-        <div className="p-4 border-t border-white/5">
-          <button 
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-400 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 transition-all"
-          >
-            <FiLogOut className="text-lg" /> Sign Out
-          </button>
-        </div>
+        <nav className="p-4 space-y-1 mt-2">
+          <p className="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-4">Menu</p>
+          {navItems.map((item) => {
+            const isActive = location.pathname.includes(item.path);
+            return (
+              <Link
+                key={item.id}
+                to={item.path}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  isActive 
+                    ? 'bg-indigo-500/10 text-indigo-400 shadow-[inset_3px_0_0_0_#6366f1]' 
+                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                }`}
+              >
+                <span className={`text-lg ${isActive ? 'text-indigo-400' : 'text-slate-500'}`}>{item.icon}</span> 
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="p-4 border-t border-white/5">
+        <button 
+          onClick={handleSignOut}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
+        >
+          <FiLogOut className="text-lg text-slate-500 hover:text-red-400" /> Sign Out
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    // ✨ Changed background to a premium deep dark with subtle radial gradient
+    <div className="flex h-screen bg-[#050505] font-sans text-slate-300 overflow-hidden selection:bg-indigo-500/30">
+      
+      {/* 🌍 DESKTOP LEFT SIDEBAR */}
+      <aside className="w-[260px] bg-[#0A0A0B] border-r border-white/5 flex-col justify-between hidden md:flex shrink-0 z-20 shadow-2xl">
+        <SidebarContent />
       </aside>
 
+      {/* 📱 MOBILE SIDEBAR (Drawer) */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 md:hidden"
+            />
+            <motion.aside 
+              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+              className="fixed top-0 left-0 bottom-0 w-72 bg-[#0A0A0B] border-r border-white/5 flex flex-col justify-between z-50 shadow-2xl md:hidden"
+            >
+              <SidebarContent />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* 🌍 GLOBAL MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/10 via-[#050505] to-[#050505]">
         
-        {/* GLOBAL TOP HEADER */}
-        <header className="h-20 shrink-0 flex items-center justify-between px-8 bg-[#0A0A0A]/80 backdrop-blur-md sticky top-0 z-10 border-b border-white/5">
-          <h1 className="text-xl font-bold text-slate-200">
-            {location.pathname === '/dashboard' ? 'Welcome back, Engineer 🚀' : 
-             location.pathname === '/profile' ? 'Profile Settings ⚙️' : 'HireMap Workspace'}
-          </h1>
+        {/* 👑 GLOBAL TOP HEADER */}
+        <header className="h-20 shrink-0 flex items-center justify-between px-6 md:px-10 bg-[#050505]/60 backdrop-blur-xl sticky top-0 z-10 border-b border-white/5">
           
-          <div className="flex items-center gap-6">
-            <div className="relative hidden md:block">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Quick search..." 
-                className="bg-[#121214] border border-white/10 rounded-full pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors w-64 text-white"
-              />
-            </div>
-            
-            <button className="relative text-slate-400 hover:text-white transition-colors">
-              <FiBell className="text-xl" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-[#0A0A0A]"></span>
+          {/* Mobile Menu Toggle & Dynamic Breadcrumb */}
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2 -ml-2 rounded-lg text-slate-400 hover:bg-white/10 md:hidden transition-colors"
+            >
+              <FiMenu size={24} />
             </button>
             
-            {/* 🚀 THE NEW CLICKABLE PROFILE SECTION */}
+            <div className="hidden sm:flex items-center gap-2 text-sm font-medium text-slate-500">
+              <span>HireMap</span>
+              <FiChevronRight size={14} />
+              <span className="text-slate-200 font-bold">{getPageTitle()}</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            
+            {/* 🚀 PREMIUM CLICKABLE PROFILE WIDGET */}
             <div 
               onClick={() => navigate('/profile')}
-              className={`flex items-center gap-3 cursor-pointer p-1.5 pr-4 rounded-full transition-all border ${
+              className={`flex items-center gap-3 cursor-pointer p-1.5 pr-4 rounded-full transition-all duration-300 border ${
                 location.pathname === '/profile' 
-                ? 'bg-indigo-500/10 border-indigo-500/30' 
-                : 'hover:bg-white/5 border-transparent'
+                ? 'bg-indigo-500/10 border-indigo-500/30 ring-2 ring-indigo-500/20' 
+                : 'bg-[#0A0A0B] border-white/5 hover:border-white/20 hover:bg-white/5'
               }`}
             >
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-0.5 shadow-[0_0_15px_rgba(79,70,229,0.2)]">
-                <div className="w-full h-full bg-[#121214] rounded-full flex items-center justify-center font-bold text-sm text-white">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-[2px] shadow-[0_0_10px_rgba(79,70,229,0.3)]">
+                <div className="w-full h-full bg-[#0A0A0B] rounded-full flex items-center justify-center font-bold text-xs text-white">
                   {getInitials(userData?.full_name)}
                 </div>
               </div>
               <div className="hidden lg:block text-left">
-                <p className="text-sm font-bold text-white leading-tight">{userData?.full_name || 'Loading...'}</p>
-                <p className="text-xs text-slate-400 leading-tight">{userData?.target_role || 'User'}</p>
+                <p className="text-sm font-bold text-slate-200 leading-tight truncate max-w-[120px]">
+                  {userData?.full_name || 'Loading...'}
+                </p>
+                <p className="text-[11px] text-indigo-400 font-medium leading-tight truncate max-w-[120px]">
+                  {userData?.target_role || 'User'}
+                </p>
               </div>
             </div>
 
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar relative">
-          <Outlet />
+        {/* ✨ MAIN OUTLET CONTAINER */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar relative z-0">
+          {/* Soft glow behind the content */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-64 bg-indigo-500/5 blur-[100px] pointer-events-none rounded-full"></div>
+          
+          <div className="relative z-10 h-full">
+            <Outlet />
+          </div>
         </main>
+
       </div>
       
     </div>

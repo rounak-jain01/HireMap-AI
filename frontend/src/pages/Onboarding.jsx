@@ -25,7 +25,6 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  // 🚀 ASALI AI RESUME UPLOAD 
   // 🚀 BULLETPROOF AI RESUME UPLOAD 
   const handleFileUpload = async (e) => {
     const uploadedFile = e.target.files[0];
@@ -47,17 +46,27 @@ export default function Onboarding() {
       });
       
       const data = await response.json();
-      console.log("📥 AI Response:", data); // 👈 YAHAN ASALI DATA DIKHEGA
+      console.log("📥 AI Response:", data); 
       
       if (response.ok) {
-        // Backend keys check kar rahe hain (extracted_skills ya skills jo bhi aaye)
-        const parsedSkills = data.extracted_skills || data.skills || [];
-        const parsedText = data.resume_text || data.text || "PDF Parsed successfully";
+        const rawSkills = data.extracted_skills || data.skills || [];
+        
+        // 🚀 THE BIG FIX: Flatten the array if AI over-categorized it into objects
+        let flatSkills = [];
+        rawSkills.forEach(item => {
+          if (typeof item === 'string') {
+            flatSkills.push(item); // Normal string hai toh direct daalo
+          } else if (item && typeof item === 'object' && Array.isArray(item.skills)) {
+            flatSkills.push(...item.skills); // Agar object hai, toh uske andar ka array nikal lo
+          }
+        });
 
-        setManualSkills(parsedSkills);
+        const parsedText = data.summary || data.resume_text || "PDF Parsed successfully";
+
+        setManualSkills(flatSkills); // Ab state mein ekdum clean Array jayega
         setExtractedResumeText(parsedText);
 
-        if (parsedSkills.length === 0) {
+        if (flatSkills.length === 0) {
           alert("AI Alert: PDF was read, but no technical skills were found!");
         }
 
@@ -66,7 +75,7 @@ export default function Onboarding() {
       } else {
         console.error("Backend Rejected PDF:", data);
         alert(`AI Error: ${data.detail || data.message || "Failed to read PDF"}`);
-        setStep('manual'); // Agar fail hua toh manual form dikhao
+        setStep('manual'); 
       }
     } catch (err) {
       console.error("❌ API Request Crashed:", err);
@@ -104,15 +113,18 @@ export default function Onboarding() {
     }
 
     try {
+      // 🚀 THE FIX: Yahan actual State Variables lagaye hain!
       const payload = {
-        email: user?.email,
-        full_name: prefs.fullName, // Naya addition
-        resume_text: extractedResumeText, // PDF ka text
-        skills: manualSkills,
-        target_role: prefs.targetRole,
-        min_salary: Number(prefs.minSalary),
-        locations: prefs.locations
+        email: user?.email || "test@test.com", 
+        full_name: prefs.fullName,                
+        skills: manualSkills,    
+        target_role: prefs.targetRole,        
+        min_salary: parseInt(prefs.minSalary) || 0, 
+        locations: prefs.locations.length > 0 ? prefs.locations : ["Remote"], 
+        resume_text: extractedResumeText
       };
+
+      console.log("📤 Sending Payload to Complete Onboarding:", payload);
 
       const response = await fetch("http://127.0.0.1:8000/complete-onboarding", {
         method: "POST",
@@ -125,7 +137,10 @@ export default function Onboarding() {
       if (response.ok && data.status === "success") {
         navigate('/dashboard');
       } else {
-        alert("Backend Error: " + (data.message || "Unknown Error"));
+        // 🚀 THE FIX: 422 error ki exact detail nikalne ke liye
+        const errorDetail = data.detail ? JSON.stringify(data.detail) : data.message;
+        alert("Backend Error: " + errorDetail);
+        console.error("❌ 422 Detail:", data.detail);
       }
     } catch (error) {
       console.error("Network Error:", error);
@@ -213,7 +228,6 @@ export default function Onboarding() {
               </h3>
               
               <div className="space-y-6">
-                {/* Full Name Field */}
                 <div>
                   <label className="block text-sm font-bold text-slate-300 mb-2 flex items-center gap-2"><FiUser className="text-blue-400"/> Full Name</label>
                   <input 
