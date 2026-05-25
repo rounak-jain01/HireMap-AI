@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom'; // 🚀 1. PORTAL IMPORT KIYA HAI
+import { createPortal } from 'react-dom'; 
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom'; // 🚀 Added for routing to pricing
 import { useAuth } from '../context/AuthContext';
 import useAppStore from '../store/useAppStore'; 
 import { 
@@ -13,6 +14,7 @@ import ReactMarkdown from 'react-markdown';
 
 export default function Jobs() {
   const { user } = useAuth();
+  const navigate = useNavigate(); // 🚀 Hook initialized
   
   const {
     allJobs, setAllJobs,
@@ -35,6 +37,7 @@ export default function Jobs() {
 
   const [isMatchingUI, setIsMatchingUI] = useState(false); 
   const [selectedJob, setSelectedJob] = useState(null); 
+  const [userTier, setUserTier] = useState('free'); // 🚀 Store subscription tier
 
   const parseJobData = (job) => {
     let parsedSkills = [];
@@ -46,7 +49,7 @@ export default function Jobs() {
     let empType = "Full-Time";
     try {
       const metaObj = typeof job.job_meta === 'string' ? JSON.parse(job.job_meta) : (job.job_meta || {});
-      if (metaObj.employment_type) empType = metaObj.employment_type.split(',')[0]; 
+      if (metaObj.employment_type) empType = metaObj.employment_type.split(',')[0].trim(); // Trimmed for accurate filtering
     } catch (e) {}
 
     const loc = job.city || "India";
@@ -135,6 +138,8 @@ export default function Jobs() {
           const data = await res.json();
           if (data.status === "success") {
             setMatchedJobs(data.jobs.map(parseJobData));
+            // 🚀 Extract and store tier from backend response
+            if(data.tier) setUserTier(data.tier); 
             setHasFetchedMatched(true);
           }
         } catch (error) {
@@ -165,10 +170,9 @@ export default function Jobs() {
 
   let filteredJobs = currentJobsDB.filter(job => {
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm ? true : (
-      job.title.toLowerCase().includes(searchLower) || job.company.toLowerCase().includes(searchLower) ||
-      job.location.toLowerCase().includes(searchLower) || job.requirements.some(skill => skill.toLowerCase().includes(searchLower))
-    );
+    
+    // 🚀 RESTRICTED SEARCH TO JOB TITLE ONLY
+    const matchesSearch = !searchTerm ? true : job.title.toLowerCase().includes(searchLower);
     
     const matchesPersonalized = isPersonalized ? job.matchScore >= MIN_MATCH_SCORE : true; 
     const matchesType = filterType === 'All' ? true : job.type === filterType;
@@ -243,7 +247,7 @@ export default function Jobs() {
               <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search role, company, location..." 
+                placeholder="Search specifically by Job Title..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl py-3 pl-12 pr-10 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
@@ -367,7 +371,7 @@ export default function Jobs() {
               {isPersonalized ? <><HiSparkles className="text-amber-400" /> Recommended for you</> : "All Available Positions"}
             </h3>
             <span className="text-sm font-medium text-slate-400 bg-[#121214] px-3 py-1 rounded-full border border-white/5">
-              Showing <span className="text-white">{filteredJobs.length}</span> of <span className="text-white">{allJobs.length}</span> jobs
+              Showing <span className="text-white">{filteredJobs.length}</span> of <span className="text-white">{isPersonalized ? matchedJobs.length : allJobs.length}</span> jobs
             </span>
           </div>
         )}
@@ -468,6 +472,31 @@ export default function Jobs() {
               )}
             </div>
 
+            {/* 🚀 SUBSCRIPTION PAYWALL BANNER */}
+            {isPersonalized && userTier === 'free' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-10 bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] pointer-events-none"></div>
+                <div className="relative z-10">
+                  <h4 className="text-xl font-black text-white flex items-center gap-2 mb-2">
+                    <HiSparkles className="text-amber-400"/> Unlock Unlimited Matches
+                  </h4>
+                  <p className="text-indigo-200/80 font-medium text-sm md:text-base max-w-xl">
+                    You are on the <span className="text-white font-bold">Learner Plan</span>, showing your top 3 AI matches. Upgrade to Pro to see all highly relevant roles perfectly suited for your profile.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => navigate('/settings')} // Routing to your settings/pricing page
+                  className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-black transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] whitespace-nowrap relative z-10"
+                >
+                  Upgrade to Pro <FiArrowRight className="inline ml-1" />
+                </button>
+              </motion.div>
+            )}
+
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-4 mt-12 mb-4">
                 <button 
@@ -536,7 +565,7 @@ export default function Jobs() {
                       <span className="text-sm font-black uppercase tracking-wider text-indigo-400 flex items-center gap-2 mb-2">
                         <HiSparkles size={18}/> AI Match Analysis
                       </span>
-                      <p className="text-base text-indigo-100/90 leading-relaxed">"{selectedJob.aiReason}"</p>
+                      <p className="text-base text-indigo-100/90 leading-relaxed italic">"{selectedJob.aiReason}"</p>
                     </div>
                   )}
 

@@ -4,7 +4,8 @@ import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiHome, FiBriefcase, FiTarget, FiMessageSquare, 
-  FiLogOut, FiTrendingUp, FiMap, FiMenu, FiX, FiChevronRight
+  FiLogOut, FiTrendingUp, FiMap, FiMenu, FiX, FiChevronRight,
+  FiDollarSign
 } from 'react-icons/fi';
 
 export default function MainLayout() {
@@ -35,6 +36,7 @@ export default function MainLayout() {
     { id: 'skillroadmap', path: '/skillroadmap', icon: <FiMap />, label: 'Learning Hub' }, 
     { id: 'interciew', path: '/interview', icon: <FiBriefcase />, label: 'Interview Hub' },
     { id: 'chat', path: '/chat', icon: <FiMessageSquare />, label: 'AI Counselor' },
+    { id: 'pricing', path: '/pricing', icon: <FiDollarSign />, label: 'Subsription' },
   ];
 
   // Smart Page Title Generator for Header

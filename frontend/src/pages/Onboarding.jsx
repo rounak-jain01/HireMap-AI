@@ -121,7 +121,8 @@ export default function Onboarding() {
         target_role: prefs.targetRole,        
         min_salary: parseInt(prefs.minSalary) || 0, 
         locations: prefs.locations.length > 0 ? prefs.locations : ["Remote"], 
-        resume_text: extractedResumeText
+        // resume_text: extractedResumeText,
+        resume_text: typeof extractedResumeText === 'object' ? JSON.stringify(extractedResumeText) : extractedResumeText
       };
 
       console.log("📤 Sending Payload to Complete Onboarding:", payload);

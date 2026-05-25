@@ -3,11 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
 import Lenis from "lenis";
 import Navbar from "../components/Navbar";
-import { useAuth } from '../context/AuthContext'; // Yeh hum Supabase ke liye banayenge
+import { useAuth } from '../context/AuthContext';
 import { 
   ArrowRight, Target, Database, BrainCircuit, 
   Sparkles, TrendingUp, BarChart3, MapPin, 
-  PlaySquare, BookOpen, GraduationCap, Activity
+  PlaySquare, BookOpen, GraduationCap, Activity,
+  Check, Zap, FileText, MessageSquare, Mic, Briefcase
 } from "lucide-react";
 
 /* =========================================
@@ -90,6 +91,41 @@ const StatsSection = () => (
     </div>
   </section>
 );
+
+const FeaturesSection = () => {
+  const features = [
+    { icon: <FileText size={24}/>, title: "AI Resume Analyzer", desc: "Get brutally honest feedback on your resume. We highlight exact skill gaps matching your target role." },
+    { icon: <Target size={24}/>, title: "Vector Job Matchmaker", desc: "No more scrolling. Our AI reads job descriptions and matches them directly to your skills via semantic search." },
+    { icon: <Mic size={24}/>, title: "Voice Mock Interviews", desc: "Practice with a lifelike AI Recruiter. Get a detailed JSON report card on your strengths and weaknesses." },
+    { icon: <TrendingUp size={24}/>, title: "Live Market Trends", desc: "Discover what's booming right now and what will dominate in 3-5 years based on scraped global data." },
+    { icon: <Activity size={24}/>, title: "Interactive Roadmaps", desc: "Don't know where to start? Generate a 6-phase project-based curriculum personalized to your goal." },
+    { icon: <MessageSquare size={24}/>, title: "24/7 AI Counselor", desc: "Stuck in your career? Chat with our specialized LLM trained specifically on tech career progression." },
+  ];
+
+  return (
+    <section className="py-24 px-6 bg-slate-50 dark:bg-[#050505] border-t border-slate-200/60 dark:border-white/5">
+      <div className="max-w-6xl mx-auto">
+        <SectionHeader 
+          badge="Everything you need" 
+          badgeIcon={Briefcase}
+          title="Replace 5 different tools with one workflow."
+          desc="HireMap brings job hunting, interview prep, and upskilling under one single, powerful AI-driven roof."
+        />
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {features.map((feature, i) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="bg-white dark:bg-[#121214] p-8 rounded-3xl border border-slate-200/60 dark:border-white/5 shadow-sm hover:border-indigo-500/30 transition-colors group">
+              <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                {feature.icon}
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{feature.title}</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{feature.desc}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
 
 const NLPDataSection = () => (
   <section className="py-24 px-6 bg-white dark:bg-[#0A0A0A]">
@@ -194,12 +230,12 @@ const GraphsSection = () => (
 
 const IndiaMapSection = () => {
 const cities = [
-    { name: "Delhi NCR", jobs: "9,800", top: "28%", left: "28%" },     // Moved Right
-    { name: "Indore", jobs: "2,800", top: "48%", left: "25%" },     // Moved Right
-    { name: "Pune", jobs: "6,100", top: "56%", left: "28%" },      // Moved Down & Right
-    { name: "Hyderabad", jobs: "8,200", top: "77%", left: "33%" },   // Moved Right & Slightly Down
-    { name: "Bengaluru", jobs: "12,450", top: "75%", left: "20%" },  // Moved Down & Right
-    { name: "Chennai", jobs: "4,500", top: "88%", left: "30%" }      // Moved Right towards the coast
+    { name: "Delhi NCR", jobs: "9,800", top: "28%", left: "28%" },     
+    { name: "Indore", jobs: "2,800", top: "48%", left: "25%" },     
+    { name: "Pune", jobs: "6,100", top: "56%", left: "28%" },      
+    { name: "Hyderabad", jobs: "8,200", top: "77%", left: "33%" },   
+    { name: "Bengaluru", jobs: "12,450", top: "75%", left: "20%" },  
+    { name: "Chennai", jobs: "4,500", top: "88%", left: "30%" }      
   ];
   return (
     <section className="py-24 px-6 border-y border-slate-200/60 dark:border-white/5 bg-white/40 dark:bg-[#0A0A0A]/40 backdrop-blur-xl relative overflow-hidden">
@@ -262,6 +298,95 @@ const RoadmapsSection = () => (
   </section>
 );
 
+const PricingSection = ({ user }) => {
+  const navigate = useNavigate();
+
+  const plans = [
+    {
+      id: 'free', name: 'Learner', price: '0', description: 'Ideal for beginners starting their journey.',
+      features: ['3 Job Matches / day', '1 AI Mock Interview', 'Standard Career Roadmap', 'Community Support'],
+      buttonText: 'Get Started', isPro: false, color: 'from-slate-700 to-slate-800'
+    },
+    {
+      id: 'pro', name: 'Career Hunter', price: '499', description: 'Accelerate your job search with AI power.',
+      features: ['Unlimited Job Matches', '10 Mock Interviews / mo', 'Priority AI Counselor', 'ATS Resume Export', 'Daily Market Insights'],
+      buttonText: 'Upgrade to Pro', isPro: true, popular: true, color: 'from-indigo-600 to-purple-600'
+    },
+    {
+      id: 'elite', name: 'Job Winner', price: '999', description: 'Total dominance with unlimited access.',
+      features: ['Everything in Pro', 'Unlimited Mock Interviews', '1-on-1 AI Mentorship', 'Direct Referral Access', 'Premium Portfolio Templates'],
+      buttonText: 'Go Elite', isPro: true, color: 'from-amber-500 to-orange-600'
+    }
+  ];
+
+  const handleAction = () => {
+    if (user) {
+      navigate('/dashboard'); 
+    } else {
+      navigate('/signup');
+    }
+  };
+
+  return (
+    <section className="py-24 px-6 bg-white dark:bg-[#0A0A0A] border-y border-slate-200/60 dark:border-white/5">
+      <div className="max-w-6xl mx-auto">
+        <SectionHeader 
+          badge="Simple Pricing" 
+          badgeIcon={Zap}
+          title="Supercharge Your Career."
+          desc="Choose the plan that fits your ambition. Get the tools you need to land your dream job faster."
+        />
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {plans.map((plan, i) => (
+            <motion.div
+              key={plan.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
+              className={`relative bg-slate-50 dark:bg-[#121214] border rounded-3xl p-8 flex flex-col h-full transition-all duration-300 hover:-translate-y-2 ${
+                plan.popular ? 'border-indigo-500 shadow-[0_0_40px_rgba(79,70,229,0.15)] scale-100 md:scale-105 z-10' : 'border-slate-200 dark:border-white/5'
+              }`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-500 text-white text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest">
+                  Most Popular
+                </div>
+              )}
+
+              <div className="mb-8">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{plan.name}</h3>
+                <p className="text-slate-500 text-sm">{plan.description}</p>
+              </div>
+
+              <div className="mb-8 flex items-baseline gap-1">
+                <span className="text-4xl font-black text-slate-900 dark:text-white">₹{plan.price}</span>
+                <span className="text-slate-500 font-medium">/month</span>
+              </div>
+
+              <div className="space-y-4 mb-10 flex-1">
+                {plan.features.map((feature, idx) => (
+                  <div key={idx} className="flex items-start gap-3">
+                    <div className={`mt-1 shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${plan.isPro ? 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700/30 text-slate-600 dark:text-slate-500'}`}>
+                      <Check size={12} />
+                    </div>
+                    <span className="text-sm text-slate-700 dark:text-slate-300 leading-tight">{feature}</span>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={handleAction} className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${
+                  plan.id === 'free' 
+                    ? 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'
+                    : `bg-gradient-to-r ${plan.color} text-white shadow-lg hover:shadow-indigo-500/20 active:scale-95`
+                }`}>
+                {plan.buttonText} {plan.id !== 'free' && <ArrowRight size={18} />}
+              </button>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 /* =========================================
    MAIN EXPORT
    ========================================= */
@@ -271,7 +396,6 @@ export default function Landing() {
     return savedTheme ? savedTheme === "dark" : true; 
   });
   
-  // Supabase Auth Context hook usage (We will build this context next)
   const { user } = useAuth() || { user: null }; 
   const navigate = useNavigate();
 
@@ -302,16 +426,17 @@ export default function Landing() {
     <div className="min-h-screen relative overflow-hidden font-sans flex flex-col">
       <div className="absolute inset-0 bg-dot-pattern z-[-1] [mask-image:linear-gradient(to_bottom,white_5%,transparent_95%)]"></div>
       
-      {/* Assuming Navbar accepts these props */}
       <Navbar isDark={isDark} setIsDark={setIsDark} user={user} />
 
       <main className="flex-grow pt-16">
         <HeroSection user={user} />
         <StatsSection />
+        <FeaturesSection /> 
         <NLPDataSection />
         <GraphsSection />
         <IndiaMapSection />
         <RoadmapsSection />
+        <PricingSection user={user} />
 
         {/* CTA */}
         <section className="py-32 px-6 relative overflow-hidden">
@@ -326,14 +451,59 @@ export default function Landing() {
         </section>
       </main>
 
-      {/* FOOTER */}
-      <footer className="bg-white dark:bg-[#050505] pt-20 pb-10 px-6 border-t border-slate-200 dark:border-white/5">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">H</div>
-            <span className="text-xl font-bold text-slate-900 dark:text-white">HireMap</span>
+      {/* 🚀 EXTENDED SaaS FOOTER */}
+      <footer className="bg-slate-50 dark:bg-[#0A0A0A] pt-24 pb-12 px-6 border-t border-slate-200 dark:border-white/5">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12 mb-16">
+            <div className="col-span-2 lg:col-span-2">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-500/30">H</div>
+                <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">HireMap</span>
+              </div>
+              <p className="text-slate-500 dark:text-slate-400 text-base leading-relaxed max-w-xs font-medium">
+                The AI-powered career intelligence platform designed to bridge the gap between your skills and industry demand.
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="font-bold text-slate-900 dark:text-white mb-6 uppercase tracking-wider text-sm">Product</h4>
+              <ul className="space-y-4 text-slate-500 dark:text-slate-400 font-medium text-sm">
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Resume Analyzer</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Job Matchmaker</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Market Trends</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">AI Roadmaps</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-bold text-slate-900 dark:text-white mb-6 uppercase tracking-wider text-sm">Resources</h4>
+              <ul className="space-y-4 text-slate-500 dark:text-slate-400 font-medium text-sm">
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Blog</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Career Guides</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Help Center</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">API Docs</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-bold text-slate-900 dark:text-white mb-6 uppercase tracking-wider text-sm">Company</h4>
+              <ul className="space-y-4 text-slate-500 dark:text-slate-400 font-medium text-sm">
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">About Us</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Terms of Service</a></li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Contact</a></li>
+              </ul>
+            </div>
           </div>
-          <p className="text-slate-500 text-sm">© 2026 HireMap. Developed with ❤️ for India.</p>
+          
+          <div className="pt-8 border-t border-slate-200 dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-6">
+            <p className="text-slate-500 dark:text-slate-500 text-sm font-medium">© 2026 HireMap. Developed with ❤️ for India.</p>
+            <div className="flex gap-6">
+              <a href="#" className="text-slate-400 hover:text-indigo-500 transition-colors">Twitter</a>
+              <a href="#" className="text-slate-400 hover:text-indigo-500 transition-colors">LinkedIn</a>
+              <a href="#" className="text-slate-400 hover:text-indigo-500 transition-colors">GitHub</a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

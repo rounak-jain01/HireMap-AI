@@ -17,6 +17,7 @@ import Roadmap from './pages/Roadmap';  // Interactive Learning Hub
 import Chat from './pages/Chat';        // AI Counselor
 import Profile from './pages/Profile';  // User Settings
 import InterviewHub from './pages/InterviewHub';
+import Pricing from './pages/Pricing';
 
 // 🛡️ The Bouncer (Protected Route Logic)
 const ProtectedRoute = ({ children }) => {
@@ -66,6 +67,7 @@ function App() {
             <Route path="/chat" element={<Chat />} />
             <Route path="/interview" element={<InterviewHub />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/pricing" element={<Pricing />} />
           </Route>
 
         </Routes>

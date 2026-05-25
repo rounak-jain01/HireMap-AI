@@ -1,18 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom'; // 🚀 Portal for Paywall
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import useAppStore from '../store/useAppStore';
 import { 
   FiBriefcase, FiTrash2, FiPlayCircle, FiMic, 
-  FiMicOff, FiStopCircle, FiArrowLeft, FiActivity, 
-  FiCheckCircle, FiXCircle, FiAward, FiStar, FiRefreshCw, FiPieChart
+  FiStopCircle, FiArrowLeft, FiActivity, 
+  FiCheckCircle, FiXCircle, FiAward, FiRefreshCw, FiPieChart,
+  FiLock, FiZap, FiArrowRight, FiX
 } from 'react-icons/fi';
 
 export default function InterviewHub() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  // 🚀 Pulling the new saveInterviewReport function
   const { savedInterviews, removeInterviewPrep, saveInterviewReport } = useAppStore();
   
   const [activeInterview, setActiveInterview] = useState(null); 
@@ -21,6 +22,10 @@ export default function InterviewHub() {
   const [chatHistory, setChatHistory] = useState([]);
   const [reportCard, setReportCard] = useState(null);
   
+  // 🚀 NAYE STATES FOR PREMIUM PAYWALL MODAL
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallMessage, setPaywallMessage] = useState("");
+
   const recognitionRef = useRef(null); 
   const currentTranscriptRef = useRef('');
 
@@ -34,16 +39,14 @@ export default function InterviewHub() {
     };
   }, []);
 
-  // 🚀 Start or Retake Interview
   const handleStartInterview = (job) => {
     setActiveInterview(job);
     setChatHistory([]);
     setReportCard(null);
-    setInterviewStatus('idle'); // Force reset status
+    setInterviewStatus('idle'); 
     askAI("", job); 
   };
 
-  // 🚀 View Saved Result Directly
   const handleViewResult = (job) => {
     setActiveInterview(job);
     setReportCard(job.reportCard);
@@ -76,6 +79,15 @@ export default function InterviewHub() {
       });
       const data = await res.json();
       
+      // 🚀 THE NEW PAYWALL TRIGGER (NO MORE UGLY ALERTS)
+      if (data.status === "limit_reached") {
+        setInterviewStatus('idle');
+        handleLeaveRoom(); // Room close karo silently
+        setPaywallMessage(data.message); // Backend ka message set karo
+        setShowPaywall(true); // Paywall Modal open karo
+        return;
+      }
+
       if (data.status === "success") {
         const aiMessage = data.reply;
         setChatHistory(prev => [
@@ -117,7 +129,7 @@ export default function InterviewHub() {
       if (recognitionRef.current) recognitionRef.current.stop();
       
       const finalAnswer = currentTranscriptRef.current.trim();
-      console.log("🗣️ You Spoke (Final):", finalAnswer || "[No audio detected]"); 
+      console.log("🎤 you: ", finalAnswer);
       
       if (finalAnswer) askAI(finalAnswer);
       else setInterviewStatus('idle');
@@ -148,6 +160,9 @@ export default function InterviewHub() {
         fullTranscript += event.results[i][0].transcript;
       }
       currentTranscriptRef.current = fullTranscript;
+      
+      // 🚀 CONSOLE LOG ADDED HERE FOR LIVE TRACKING
+      // console.log("🎤 Live Transcript: ", currentTranscriptRef.current);
     };
 
     recognition.onerror = (e) => {
@@ -189,10 +204,10 @@ export default function InterviewHub() {
         })
       });
       const data = await res.json();
+      // console.log(data)
       
       if (data.status === "success") {
         setReportCard(data.evaluation);
-        // 🚀 PERMANENTLY SAVE REPORT TO ZUSTAND & LOCALSTORAGE
         saveInterviewReport(activeInterview.id, data.evaluation);
         setInterviewStatus('report');
       } else {
@@ -219,8 +234,6 @@ export default function InterviewHub() {
             <button onClick={handleLeaveRoom} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold">
               <FiArrowLeft /> Back to Hub
             </button>
-            
-            {/* 🚀 RETAKE INTERVIEW BUTTON */}
             <button onClick={() => handleStartInterview(activeInterview)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-[0_0_15px_rgba(79,70,229,0.3)] transition-all">
               <FiRefreshCw /> Retake Interview
             </button>
@@ -367,7 +380,6 @@ export default function InterviewHub() {
              interviewStatus === 'listening' ? "Speak clearly. Click the mic again when you are done." : 
              "Please wait..."}
           </p>
-
         </div>
 
         <div className="h-32 shrink-0 flex items-center justify-center bg-gradient-to-t from-[#0A0A0B] to-transparent relative z-10 pb-8">
@@ -391,7 +403,7 @@ export default function InterviewHub() {
   // VIEW 2: THE PREPARATION BOARD (LIST VIEW)
   // ==========================================
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto w-full h-full">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto w-full h-full relative">
       <div className="mb-10">
         <h1 className="text-3xl md:text-4xl font-black mb-2 flex items-center gap-3 text-white">
           Interview Hub
@@ -426,7 +438,6 @@ export default function InterviewHub() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="bg-[#121214] border border-white/5 hover:border-indigo-500/30 rounded-3xl p-6 flex flex-col justify-between group transition-all shadow-lg relative overflow-hidden"
               >
-                {/* 🚀 SCORE BANNER ON CARD IF INTERVIEWED */}
                 {job.reportCard && (
                   <div className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-black px-4 py-1.5 rounded-bl-xl shadow-lg flex items-center gap-1">
                     <FiAward /> Score: {job.reportCard.score}/100
@@ -460,7 +471,6 @@ export default function InterviewHub() {
                   </div>
                 </div>
 
-                {/* 🚀 TOGGLE BUTTON BASED ON REPORT EXISTANCE */}
                 {job.reportCard ? (
                   <div className="flex gap-2">
                     <button 
@@ -490,6 +500,65 @@ export default function InterviewHub() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* 🚀 THE BEAUTIFUL PAYWALL MODAL PORTAL */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showPaywall && (
+            <div className="fixed inset-0 z-[999] flex items-center justify-center px-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={() => setShowPaywall(false)}
+                className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }} 
+                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.9, y: 20 }} 
+                className="bg-[#121214] border border-indigo-500/30 rounded-3xl p-8 max-w-md w-full relative z-[1000] overflow-hidden text-center shadow-[0_0_50px_rgba(79,70,229,0.15)]"
+              >
+                {/* Background Glow */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/4"></div>
+                
+                <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors bg-white/5 p-2 rounded-full">
+                  <FiX size={20} />
+                </button>
+
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mb-6 text-indigo-400">
+                  <FiLock size={32} />
+                </div>
+                
+                <h3 className="text-2xl font-black text-white mb-2">Limit Reached</h3>
+                <p className="text-slate-400 font-medium mb-8 leading-relaxed">
+                  {paywallMessage}
+                </p>
+
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => {
+                      setShowPaywall(false);
+                      navigate('/settings'); // Upgrade route
+                    }} 
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(79,70,229,0.3)]"
+                  >
+                    <FiZap /> View Pro Plans
+                  </button>
+                  <button 
+                    onClick={() => setShowPaywall(false)} 
+                    className="w-full bg-transparent border border-white/10 hover:bg-white/5 text-slate-300 font-bold py-3.5 rounded-xl transition-all"
+                  >
+                    Maybe Later
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
     </div>
   );
 }
