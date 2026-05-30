@@ -83,6 +83,7 @@ def extract_job_meta(soup: BeautifulSoup) -> dict:
             elif "ug" in label: meta["education_ug"] = val
     return meta
 
+    
 def extract_jd(soup: BeautifulSoup) -> str:
     """Extracts main job description text safely"""
     try:

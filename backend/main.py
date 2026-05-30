@@ -746,5 +746,5 @@ def update_roadmap_step(roadmap_id: str, payload: UpdateRoadmapRequest):
             "roadmap_data": payload.updated_data, "progress": payload.new_progress
         }).eq("id", roadmap_id).execute()
         return {"status": "success"}
-    except Exception as e:
+    except Exception as e:  
         return {"status": "error", "message": str(e)}
