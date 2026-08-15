@@ -13,10 +13,14 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 import PyPDF2
+import pdfplumber
 import razorpay
 from supabase import create_client, Client
 from groq import Groq
 from sentence_transformers import SentenceTransformer
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 # ==========================================
 # 📂 SECTION 1: SETUP & GLOBAL CLIENTS
@@ -24,11 +28,7 @@ from sentence_transformers import SentenceTransformer
 load_dotenv()
 
 # Initialize FastAPI App
-app = FastAPI(
-    title="HireMap AI API", 
-    description="Modular Backend for HireMap",
-    version="3.1.0"
-)
+app = FastAPI()
 
 # Load Environment Variables securely
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
@@ -75,13 +75,34 @@ def calculate_similarity(vec1: list, vec2: list) -> float:
     """Cosine similarity between two vectors"""
     if not vec1 or not vec2: return 0.0
     dot_product = sum(a * b for a, b in zip(vec1, vec2))
-    mag1, mag2 = math.sqrt(sum(a * a for a in vec1)), math.sqrt(sum(b * b for b in vec2))
+    mag1, mag2 = math.sqrt(sum(a * a for a in vec1)), math.sqrt(sum(b * b for b in vec2)) #Formula for ca
     return 0.0 if mag1 == 0 or mag2 == 0 else dot_product / (mag1 * mag2)
 
 def parse_ai_json(raw_content: str) -> dict:
-    """Universal cleaner for Llama 3.1 Markdown JSON output"""
+    """Universal cleaner - handles markdown fences AND unexpected list-wrapped responses"""
     cleaned_content = raw_content.replace("```json", "").replace("```", "").strip()
-    return json.loads(cleaned_content)
+    parsed = json.loads(cleaned_content)
+    
+    if isinstance(parsed, list):
+        print("⚠️ WARNING: LLM returned a list instead of dict, extracting first element")
+        return parsed[0] if parsed and isinstance(parsed[0], dict) else {}
+    
+    if not isinstance(parsed, dict):
+        print("⚠️ WARNING: LLM returned unexpected type:", type(parsed))
+        return {}
+    
+    return parsed
+
+
+def extract_resume_text(file_bytes: bytes) -> str:
+    """Better PDF extraction using pdfplumber - handles layouts better than PyPDF2"""
+    text = ""
+    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+    return text.strip()
 
 
 # ==========================================
@@ -154,7 +175,7 @@ class VerifyRequest(BaseModel):
 # ==========================================
 # 🚀 SECTION 4: SYSTEM & PAYMENT ROUTES
 # ==========================================
-@app.get("/")
+@app.get("/api/health")
 def read_root():
     return {"message": "Welcome to HireMap API! System is running 🚀"}
 
@@ -210,15 +231,22 @@ async def register_seeker(email: str = Form(default="unknown"), file: UploadFile
     """Extracts text from PDF and generates a Rich Persona + Skills via Groq AI"""
     try:
         content = await file.read()
-        resume_text = "".join(page.extract_text() for page in PyPDF2.PdfReader(io.BytesIO(content)).pages)
+        # resume_text = "".join(page.extract_text() for page in PyPDF2.PdfReader(io.BytesIO(content)).pages)
+        resume_text = extract_resume_text(content)
 
         prompt = f"""
-        Read the entire resume text carefully. Return ONLY a valid JSON object.
-        1. "skills": Array of all technical/soft skills.
-        2. "rich_persona": A highly detailed 3-4 sentence paragraph defining this candidate. Mention their exact profession (e.g., Frontend Developer, HR Manager), their experience level, key achievements, and the exact type of roles they are suited for. DO NOT miss their core industry.
-        
-        Resume Text: {resume_text[:3000]} 
-        """
+Read the entire resume text carefully. Return ONLY a valid JSON OBJECT (not an array).
+
+The response MUST be structured EXACTLY like this (a single JSON object at the root level):
+{{
+    "skills": ["skill1", "skill2", ...],
+    "rich_persona": "detailed paragraph here..."
+}}
+
+DO NOT wrap this object inside an array. DO NOT return multiple objects.
+
+Resume Text: {resume_text[:3000]} 
+"""
 
         chat = client.chat.completions.create(
             messages=[
@@ -355,7 +383,7 @@ def format_jd_with_ai(raw_jd: str) -> str:
         chat = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model="llama-3.1-8b-instant",
-            temperature=0.2
+            temperature=0
         )
         return chat.choices[0].message.content.strip()
     except Exception as e:
@@ -561,7 +589,7 @@ TRANSCRIPT:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "system", "content": system_prompt}],
             model="llama-3.1-8b-instant",
-            temperature=0.2, # Low temp for factual JSON
+            temperature=0, # Low temp for factual JSON
             response_format={"type": "json_object"}
         )
 
@@ -748,3 +776,48 @@ def update_roadmap_step(roadmap_id: str, payload: UpdateRoadmapRequest):
         return {"status": "success"}
     except Exception as e:  
         return {"status": "error", "message": str(e)}
+    
+
+# ==========================================
+# 🖥️ SECTION 10: SERVE REACT FRONTEND (for EXE)
+# ==========================================
+import sys
+
+def resource_path(relative_path):
+    """PyInstaller ke andar bundled files ka correct path dega"""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+frontend_dist = resource_path("frontend_dist")
+assets_dir = os.path.join(frontend_dist, "assets")
+
+# ✅ Safe check for local development mode
+if os.path.exists(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_react_app(full_path: str):
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+else:
+    print("⚠️ Running in Pure API Development Mode (Frontend handled separately by Vite)")
+
+
+# ==========================================
+# 🚀 SECTION 11: ENTRY POINT (for EXE)
+# ==========================================
+if __name__ == "__main__":
+    import uvicorn
+    import webbrowser
+    import threading
+
+    def open_browser():
+        webbrowser.open_new("http://127.0.0.1:8000/")
+
+    threading.Timer(1.5, open_browser).start()
+    uvicorn.run(app, host="127.0.0.1", port=8000)
